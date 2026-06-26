@@ -1,0 +1,160 @@
+.wrap {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.center {
+  text-align: center;
+  padding: 5rem 1rem;
+}
+
+.denied {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.hint {
+  font-size: 13px;
+  color: #888;
+}
+
+.hint code {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #888;
+  margin-top: 3px;
+}
+
+.empty {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: #888;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.empty span { font-size: 36px; }
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 1.1rem;
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 0.6rem;
+}
+
+.emoji {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cardInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+}
+
+.cardBuilder {
+  font-size: 12px;
+  color: #888;
+  margin-top: 1px;
+}
+
+.cardUrl {
+  font-size: 11px;
+  color: #FF6B2B;
+  word-break: break-all;
+  display: block;
+  margin-top: 3px;
+}
+
+.cardUrl:hover { text-decoration: underline; }
+
+.tagPill {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #f0f0f0;
+  color: #555;
+  padding: 3px 8px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+
+.cardDesc {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.approveBtn, .rejectBtn {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.approveBtn:disabled, .rejectBtn:disabled { opacity: 0.5; }
+
+.approveBtn {
+  background: #111;
+  color: #fff;
+}
+
+.approveBtn:hover:not(:disabled) { background: #333; }
+
+.rejectBtn {
+  background: #f5f5f5;
+  color: #555;
+}
+
+.rejectBtn:hover:not(:disabled) { background: #e5e5e5; }
