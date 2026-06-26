@@ -97,7 +97,7 @@ const SEED_PROJECTS: Project[] = [
     name: 'Tripwire',
     desc: 'Token-gated dashboard for CLAWD holders',
     emoji: '🔐',
-    url: 'https://tripwire.vercel.app',
+    url: 'https://tripwire-app.vercel.app/',
     tag: 'tool',
     builder: 'Zeitgeist Jones',
     status: 'approved',
