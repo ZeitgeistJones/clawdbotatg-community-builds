@@ -11,11 +11,8 @@ export async function POST(req: NextRequest) {
     const project = await getProject(id)
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
-    if (!project.walletAddress) {
-      return NextResponse.json({ error: 'Use the admin panel to update this project.' }, { status: 403 })
-    }
-
-    if (project.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+    // if no wallet on file, allow any connected wallet to claim it
+    if (project.walletAddress && project.walletAddress.toLowerCase() !== walletAddress.toLowerCase()) {
       return NextResponse.json({ error: 'Wallet does not match.' }, { status: 403 })
     }
 
@@ -23,6 +20,8 @@ export async function POST(req: NextRequest) {
     if (buildStatus !== undefined) meta.buildStatus = buildStatus
     if (featureTags !== undefined) meta.featureTags = featureTags
     if (manualTagsOverride !== undefined) meta.manualTagsOverride = manualTagsOverride
+    // save wallet if not already set
+    if (!project.walletAddress) meta.walletAddress = walletAddress
 
     await updateProjectMeta(id, meta)
     return NextResponse.json({ ok: true })
