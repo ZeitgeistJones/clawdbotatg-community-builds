@@ -7,6 +7,18 @@ const kv = new Redis({
 export type ProjectStatus = 'pending' | 'approved' | 'rejected'
 export type BuildStatus = 'building' | 'beta' | 'v1' | 'offline' | string
 
+export interface FeatureTag {
+  type: 'token_gate' | 'free_uses' | 'burns_clawd' | 'paid' | 'free' | 'subject_to_change' | 'custom'
+  label: string      // display label e.g. "10M CLAWD gate", "burns 5%", "$0.10/gen"
+  value?: string     // optional numeric/text value
+}
+
+export interface ProjectMeta {
+  buildStatus?: BuildStatus
+  featureTags?: FeatureTag[]
+  manualTagsOverride?: boolean  // if true, skip auto-fetch and use manual tags only
+}
+
 export interface Project {
   id: string
   name: string
@@ -18,25 +30,66 @@ export interface Project {
   walletAddress?: string
   status: ProjectStatus
   buildStatus?: BuildStatus
+  featureTags?: FeatureTag[]
+  manualTagsOverride?: boolean
   submittedAt: number
 }
 
 const APPROVED_KEY = 'projects:approved'
 const PENDING_KEY  = 'projects:pending'
 
+// Try to fetch live status from app's /api/status endpoint
+export async function fetchAppStatus(url: string): Promise<{ featureTags?: FeatureTag[]; buildStatus?: BuildStatus } | null> {
+  try {
+    const base = url.replace(/\/$/, '')
+    const res = await fetch(`${base}/api/status`, { next: { revalidate: 300 } })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
 export async function getApproved(): Promise<Project[]> {
-  const seedStatuses = await Promise.all(
-    SEED_PROJECTS.map(p => kv.get<string>(`buildstatus:${p.id}`))
+  const seedMetas = await Promise.all(
+    SEED_PROJECTS.map(p => kv.get<ProjectMeta>(`meta:${p.id}`))
   )
-  const hydratedSeeds = SEED_PROJECTS.map((p, i) => ({
-    ...p,
-    buildStatus: (seedStatuses[i] ?? p.buildStatus) as BuildStatus,
+  const hydratedSeeds = await Promise.all(SEED_PROJECTS.map(async (p, i) => {
+    const meta = seedMetas[i]
+    let featureTags = meta?.featureTags ?? p.featureTags
+    let buildStatus = (meta?.buildStatus ?? p.buildStatus) as BuildStatus
+
+    // auto-fetch if no manual override
+    if (!meta?.manualTagsOverride) {
+      const live = await fetchAppStatus(p.url)
+      if (live) {
+        if (live.featureTags && !featureTags) featureTags = live.featureTags
+        if (live.buildStatus && !meta?.buildStatus) buildStatus = live.buildStatus
+      }
+    }
+
+    return { ...p, buildStatus, featureTags }
   }))
 
   const ids = await kv.lrange<string>(APPROVED_KEY, 0, -1)
   if (!ids.length) return hydratedSeeds
+
   const projects = await Promise.all(ids.map(id => kv.get<Project>(`project:${id}`)))
-  return [...hydratedSeeds, ...(projects.filter(Boolean) as Project[])]
+  const kvProjects = await Promise.all((projects.filter(Boolean) as Project[]).map(async p => {
+    if (!p.manualTagsOverride) {
+      const live = await fetchAppStatus(p.url)
+      if (live) {
+        return {
+          ...p,
+          featureTags: p.featureTags ?? live.featureTags,
+          buildStatus: p.buildStatus ?? live.buildStatus,
+        }
+      }
+    }
+    return p
+  }))
+
+  return [...hydratedSeeds, ...kvProjects]
 }
 
 export async function getPending(): Promise<Project[]> {
@@ -49,8 +102,13 @@ export async function getPending(): Promise<Project[]> {
 export async function getProject(id: string): Promise<Project | null> {
   const seed = SEED_PROJECTS.find(p => p.id === id)
   if (seed) {
-    const overrideStatus = await kv.get<string>(`buildstatus:${id}`)
-    return { ...seed, buildStatus: (overrideStatus ?? seed.buildStatus) as BuildStatus }
+    const meta = await kv.get<ProjectMeta>(`meta:${id}`)
+    return {
+      ...seed,
+      buildStatus: (meta?.buildStatus ?? seed.buildStatus) as BuildStatus,
+      featureTags: meta?.featureTags ?? seed.featureTags,
+      manualTagsOverride: meta?.manualTagsOverride,
+    }
   }
   return kv.get<Project>(`project:${id}`)
 }
@@ -78,20 +136,21 @@ export async function rejectProject(id: string): Promise<void> {
   await kv.lrem(PENDING_KEY, 0, id)
 }
 
-export async function updateBuildStatus(id: string, buildStatus: BuildStatus): Promise<void> {
+export async function updateProjectMeta(id: string, meta: Partial<ProjectMeta>): Promise<void> {
   if (id.startsWith('seed-')) {
-    await kv.set(`buildstatus:${id}`, buildStatus)
+    const existing = await kv.get<ProjectMeta>(`meta:${id}`) || {}
+    await kv.set(`meta:${id}`, { ...existing, ...meta })
     return
   }
   const project = await kv.get<Project>(`project:${id}`)
   if (!project) throw new Error('Project not found')
-  await kv.set(`project:${id}`, { ...project, buildStatus })
+  await kv.set(`project:${id}`, { ...project, ...meta })
 }
 
 const SEED_PROJECTS: Project[] = [
   {
     id: 'seed-1',
-    name: 'Talk __ 2 Me',
+    name: 'Talk Normie 2 Me',
     desc: 'Explains any GitHub repo in plain English, with personality modes',
     emoji: '🗣️',
     url: 'https://talk-normie-2-me.vercel.app',
@@ -100,6 +159,10 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'v1',
+    featureTags: [
+      { type: 'free_uses', label: '2 free uses' },
+      { type: 'token_gate', label: '10M CLAWD gate' },
+    ],
     submittedAt: 0,
   },
   {
@@ -113,6 +176,9 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'building',
+    featureTags: [
+      { type: 'free', label: 'free to use' },
+    ],
     submittedAt: 0,
   },
   {
@@ -126,6 +192,9 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'v1',
+    featureTags: [
+      { type: 'free', label: 'free to use' },
+    ],
     submittedAt: 0,
   },
   {
@@ -139,6 +208,9 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'v1',
+    featureTags: [
+      { type: 'token_gate', label: '10M CLAWD gate' },
+    ],
     submittedAt: 0,
   },
 ]

@@ -1,4 +1,5 @@
 import { getApproved } from '@/lib/projects'
+import type { FeatureTag } from '@/lib/projects'
 import styles from './page.module.css'
 import Link from 'next/link'
 
@@ -14,6 +15,16 @@ const BUILD_STATUS_STYLE: Record<string, { bg: string; color: string; dot: strin
   beta:     { bg: '#EDE8FF', color: '#5533B5', dot: '#7B61FF' },
   v1:       { bg: '#E5F5EE', color: '#0D6E4A', dot: '#2ECC71' },
   offline:  { bg: '#F5F5F5', color: '#888888', dot: '#BBBBBB' },
+}
+
+const FEATURE_TAG_STYLE: Record<string, { bg: string; color: string; icon: string }> = {
+  token_gate:       { bg: '#FFF0E8', color: '#B04A10', icon: '🔒' },
+  free_uses:        { bg: '#E8F4FF', color: '#1A5FA8', icon: '⚡' },
+  burns_clawd:      { bg: '#FFF0F0', color: '#AA2222', icon: '🔥' },
+  paid:             { bg: '#F0FFF0', color: '#1A6B2A', icon: '💵' },
+  free:             { bg: '#F0FFF0', color: '#1A6B2A', icon: '🌐' },
+  subject_to_change:{ bg: '#FFFFF0', color: '#7A6A00', icon: '⚠️' },
+  custom:           { bg: '#F5F5F5', color: '#555555', icon: '•' },
 }
 
 function getBuildStatusStyle(status?: string) {
@@ -49,13 +60,7 @@ export default async function Home() {
           const tag = TAG_STYLE[p.tag] || TAG_STYLE.tool
           const bStyle = getBuildStatusStyle(p.buildStatus)
           return (
-            <a
-              key={p.id}
-              href={p.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.card}
-            >
+            <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" className={styles.card}>
               {bStyle && (
                 <div className={styles.statusBadge} style={{ background: bStyle.bg, color: bStyle.color }}>
                   <span className={styles.statusDot} style={{ background: bStyle.dot }} />
@@ -68,6 +73,18 @@ export default async function Home() {
               <span className={styles.tag} style={{ background: tag.bg, color: tag.color }}>
                 {p.tag}
               </span>
+              {p.featureTags && p.featureTags.length > 0 && (
+                <div className={styles.featureTags}>
+                  {p.featureTags.map((ft: FeatureTag, i: number) => {
+                    const fStyle = FEATURE_TAG_STYLE[ft.type] || FEATURE_TAG_STYLE.custom
+                    return (
+                      <span key={i} className={styles.featureTag} style={{ background: fStyle.bg, color: fStyle.color }}>
+                        {fStyle.icon} {ft.label}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
               <div className={styles.builder}>
                 <div className={styles.dot}>{initials(p.builder)}</div>
                 <span>{p.builder}</span>
@@ -82,6 +99,10 @@ export default async function Home() {
           <span className={styles.addNote}>reviewed before it goes live</span>
         </Link>
       </div>
+
+      <p className={styles.disclaimer}>
+        ⚠️ pricing, access requirements, and feature tags are set by individual builders and may not reflect the current state of each app. always verify before connecting your wallet or making any transactions.
+      </p>
 
       <footer className={styles.footer}>
         built on <a href="https://base.org" target="_blank" rel="noopener noreferrer">Base</a> · powered by CLAWD

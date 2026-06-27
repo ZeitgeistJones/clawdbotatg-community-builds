@@ -46,7 +46,7 @@
   transition: border-color 0.15s, transform 0.12s;
   overflow: hidden;
   cursor: pointer;
-  min-height: 190px;
+  min-height: 200px;
   text-decoration: none;
   color: inherit;
 }
@@ -83,7 +83,7 @@
   line-height: 1;
   margin-bottom: 0.6rem;
   display: block;
-  margin-top: 1.2rem;
+  margin-top: 1.4rem;
 }
 
 .cardName {
@@ -110,6 +110,21 @@
   border-radius: 99px;
   text-transform: uppercase;
   align-self: flex-start;
+}
+
+.featureTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.featureTag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
 }
 
 .builder {
@@ -169,9 +184,19 @@
   color: #aaa;
 }
 
+.disclaimer {
+  max-width: 600px;
+  margin: 2.5rem auto 0;
+  text-align: center;
+  font-size: 11px;
+  color: #aaa;
+  line-height: 1.6;
+  padding: 0 1rem;
+}
+
 .footer {
   text-align: center;
-  margin-top: 3rem;
+  margin-top: 1.5rem;
   font-size: 12px;
   color: #aaa;
 }

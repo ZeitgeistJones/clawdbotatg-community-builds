@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getProject, updateBuildStatus } from '@/lib/projects'
+import { getProject, updateProjectMeta } from '@/lib/projects'
 
 export async function POST(req: NextRequest) {
   try {
-    const { id, buildStatus, walletAddress } = await req.json()
-    if (!id || !buildStatus || !walletAddress) {
+    const { id, buildStatus, featureTags, manualTagsOverride, walletAddress } = await req.json()
+    if (!id || !walletAddress) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
 
     const project = await getProject(id)
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
-    // seed projects (no walletAddress) can only be updated via admin
     if (!project.walletAddress) {
       return NextResponse.json({ error: 'Use the admin panel to update this project.' }, { status: 403 })
     }
@@ -20,7 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Wallet does not match.' }, { status: 403 })
     }
 
-    await updateBuildStatus(id, buildStatus)
+    const meta: Record<string, unknown> = {}
+    if (buildStatus !== undefined) meta.buildStatus = buildStatus
+    if (featureTags !== undefined) meta.featureTags = featureTags
+    if (manualTagsOverride !== undefined) meta.manualTagsOverride = manualTagsOverride
+
+    await updateProjectMeta(id, meta)
     return NextResponse.json({ ok: true })
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
