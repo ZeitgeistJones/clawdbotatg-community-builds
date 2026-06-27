@@ -4,6 +4,13 @@
   padding: 2.5rem 1.5rem 4rem;
 }
 
+.center {
+  text-align: center;
+  padding: 5rem 1rem;
+  color: #888;
+  font-size: 14px;
+}
+
 .back {
   font-size: 13px;
   color: #888;
@@ -20,10 +27,10 @@
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.5px;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
 }
 
-.subtitle { font-size: 13px; color: #888; }
+.subtitle { font-size: 14px; color: #888; }
 
 .form {
   display: flex;
@@ -35,7 +42,6 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  position: relative;
 }
 
 .label {
@@ -46,25 +52,10 @@
   text-transform: uppercase;
 }
 
-.walletWrap { display: flex; }
-
-.walletNote {
-  font-size: 11px;
-  color: #aaa;
-  line-height: 1.4;
-}
-
-.charCount {
-  font-size: 11px;
-  color: #bbb;
-  text-align: right;
-  margin-top: 2px;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.walletMismatch {
+  font-size: 12px;
+  color: #cc3333;
+  margin-top: 4px;
 }
 
 .statusRow {
@@ -101,7 +92,7 @@
   padding: 10px 12px;
 }
 
-.submitBtn {
+.saveBtn {
   background: #111;
   color: #fff;
   border: none;
@@ -113,36 +104,30 @@
   margin-top: 0.5rem;
 }
 
-.submitBtn:hover:not(:disabled) { background: #333; }
-.submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.saveBtn:hover:not(:disabled) { background: #333; }
+.saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .success {
   text-align: center;
   padding: 4rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.successEmoji {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 1rem;
-}
+.success span { font-size: 40px; }
 
 .success h1 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
-  margin-bottom: 0.5rem;
 }
 
-.success p {
-  font-size: 14px;
-  color: #888;
-  margin-bottom: 2rem;
-  line-height: 1.6;
-}
+.success p { font-size: 14px; color: #888; }
 
 .backBtn {
-  display: inline-block;
   font-size: 13px;
   color: #FF6B2B;
   font-weight: 600;
+  margin-top: 0.5rem;
 }

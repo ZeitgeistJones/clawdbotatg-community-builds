@@ -158,3 +158,111 @@
 }
 
 .rejectBtn:hover:not(:disabled) { background: #e5e5e5; }
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 1rem;
+}
+
+.tab {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #e5e5e5;
+  background: #fafafa;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.12s;
+}
+
+.tab:hover { border-color: #bbb; color: #111; }
+
+.tabActive {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.badge {
+  background: #FF6B2B;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+}
+
+.cardWallet {
+  font-size: 11px;
+  color: #bbb;
+  font-family: monospace;
+  margin-top: 1px;
+}
+
+.statusSection {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee;
+}
+
+.statusLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.statusBtn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid #e5e5e5;
+  background: #fafafa;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.statusBtn:hover:not(:disabled) { border-color: #bbb; }
+.statusBtn:disabled { opacity: 0.5; }
+
+.statusBtnActive {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.customInput {
+  width: 110px !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  border-radius: 99px !important;
+}
+
+.editLink {
+  font-size: 11px;
+  color: #bbb;
+  margin-top: 8px;
+}
+
+.editLink a {
+  color: #FF6B2B;
+  text-decoration: none;
+}
+
+.editLink a:hover { text-decoration: underline; }

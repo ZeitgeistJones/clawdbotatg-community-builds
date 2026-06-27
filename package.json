@@ -11,7 +11,11 @@
     "next": "14.2.3",
     "react": "^18",
     "react-dom": "^18",
-    "@upstash/redis": "^1.28.0"
+    "@upstash/redis": "^1.28.0",
+    "@rainbow-me/rainbowkit": "^2.1.2",
+    "wagmi": "^2.10.5",
+    "viem": "^2.13.4",
+    "@tanstack/react-query": "^5.40.0"
   },
   "devDependencies": {
     "@types/node": "^20",

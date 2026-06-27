@@ -17,7 +17,7 @@
 }
 
 .title {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.5px;
   color: #111;
@@ -46,7 +46,9 @@
   transition: border-color 0.15s, transform 0.12s;
   overflow: hidden;
   cursor: pointer;
-  min-height: 180px;
+  min-height: 190px;
+  text-decoration: none;
+  color: inherit;
 }
 
 .card:hover {
@@ -54,11 +56,34 @@
   transform: translateY(-2px);
 }
 
+.statusBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 8px 3px 6px;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: lowercase;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .emoji {
   font-size: 36px;
   line-height: 1;
   margin-bottom: 0.6rem;
   display: block;
+  margin-top: 1.2rem;
 }
 
 .cardName {
@@ -151,6 +176,4 @@
   color: #aaa;
 }
 
-.footer a {
-  color: #FF6B2B;
-}
+.footer a { color: #FF6B2B; }

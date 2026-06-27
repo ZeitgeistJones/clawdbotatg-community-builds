@@ -9,6 +9,18 @@ const TAG_STYLE: Record<string, { bg: string; color: string }> = {
   social: { bg: '#FFF0F5', color: '#A02050' },
 }
 
+const BUILD_STATUS_STYLE: Record<string, { bg: string; color: string; dot: string }> = {
+  building: { bg: '#FFFBE6', color: '#92600A', dot: '#F5A623' },
+  beta:     { bg: '#EDE8FF', color: '#5533B5', dot: '#7B61FF' },
+  v1:       { bg: '#E5F5EE', color: '#0D6E4A', dot: '#2ECC71' },
+  offline:  { bg: '#F5F5F5', color: '#888888', dot: '#BBBBBB' },
+}
+
+function getBuildStatusStyle(status?: string) {
+  if (!status) return null
+  return BUILD_STATUS_STYLE[status] || { bg: '#F0F0FF', color: '#444', dot: '#999' }
+}
+
 function initials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
@@ -35,6 +47,7 @@ export default async function Home() {
       <div className={styles.grid}>
         {projects.map(p => {
           const tag = TAG_STYLE[p.tag] || TAG_STYLE.tool
+          const bStyle = getBuildStatusStyle(p.buildStatus)
           return (
             <a
               key={p.id}
@@ -43,13 +56,16 @@ export default async function Home() {
               rel="noopener noreferrer"
               className={styles.card}
             >
+              {bStyle && (
+                <div className={styles.statusBadge} style={{ background: bStyle.bg, color: bStyle.color }}>
+                  <span className={styles.statusDot} style={{ background: bStyle.dot }} />
+                  {p.buildStatus}
+                </div>
+              )}
               <span className={styles.emoji}>{p.emoji}</span>
               <div className={styles.cardName}>{p.name}</div>
               <div className={styles.cardDesc}>{p.desc}</div>
-              <span
-                className={styles.tag}
-                style={{ background: tag.bg, color: tag.color }}
-              >
+              <span className={styles.tag} style={{ background: tag.bg, color: tag.color }}>
                 {p.tag}
               </span>
               <div className={styles.builder}>

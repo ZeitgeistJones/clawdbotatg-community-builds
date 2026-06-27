@@ -5,6 +5,7 @@ const kv = new Redis({
 })
 
 export type ProjectStatus = 'pending' | 'approved' | 'rejected'
+export type BuildStatus = 'building' | 'beta' | 'v1' | 'offline' | string
 
 export interface Project {
   id: string
@@ -14,7 +15,9 @@ export interface Project {
   url: string
   tag: 'tool' | 'game' | 'data' | 'social'
   builder: string
+  walletAddress?: string
   status: ProjectStatus
+  buildStatus?: BuildStatus
   submittedAt: number
 }
 
@@ -25,7 +28,7 @@ export async function getApproved(): Promise<Project[]> {
   const ids = await kv.lrange<string>(APPROVED_KEY, 0, -1)
   if (!ids.length) return SEED_PROJECTS
   const projects = await Promise.all(ids.map(id => kv.get<Project>(`project:${id}`)))
-  return projects.filter(Boolean) as Project[]
+  return [...SEED_PROJECTS, ...(projects.filter(Boolean) as Project[])]
 }
 
 export async function getPending(): Promise<Project[]> {
@@ -33,6 +36,13 @@ export async function getPending(): Promise<Project[]> {
   if (!ids.length) return []
   const projects = await Promise.all(ids.map(id => kv.get<Project>(`project:${id}`)))
   return projects.filter(Boolean) as Project[]
+}
+
+export async function getProject(id: string): Promise<Project | null> {
+  // check seed projects first
+  const seed = SEED_PROJECTS.find(p => p.id === id)
+  if (seed) return seed
+  return kv.get<Project>(`project:${id}`)
 }
 
 export async function submitProject(data: Omit<Project, 'id' | 'status' | 'submittedAt'>): Promise<Project> {
@@ -58,6 +68,12 @@ export async function rejectProject(id: string): Promise<void> {
   await kv.lrem(PENDING_KEY, 0, id)
 }
 
+export async function updateBuildStatus(id: string, buildStatus: BuildStatus): Promise<void> {
+  const project = await kv.get<Project>(`project:${id}`)
+  if (!project) throw new Error('Project not found')
+  await kv.set(`project:${id}`, { ...project, buildStatus })
+}
+
 const SEED_PROJECTS: Project[] = [
   {
     id: 'seed-1',
@@ -67,7 +83,9 @@ const SEED_PROJECTS: Project[] = [
     url: 'https://talk-normie-2-me.vercel.app',
     tag: 'tool',
     builder: 'Zeitgeist Jones',
+    walletAddress: undefined,
     status: 'approved',
+    buildStatus: 'v1',
     submittedAt: 0,
   },
   {
@@ -78,7 +96,9 @@ const SEED_PROJECTS: Project[] = [
     url: 'https://iveseenthings.vercel.app',
     tag: 'tool',
     builder: 'Zeitgeist Jones',
+    walletAddress: undefined,
     status: 'approved',
+    buildStatus: 'building',
     submittedAt: 0,
   },
   {
@@ -89,7 +109,9 @@ const SEED_PROJECTS: Project[] = [
     url: 'https://larvaereview.vercel.app',
     tag: 'data',
     builder: 'Zeitgeist Jones',
+    walletAddress: undefined,
     status: 'approved',
+    buildStatus: 'v1',
     submittedAt: 0,
   },
   {
@@ -100,7 +122,9 @@ const SEED_PROJECTS: Project[] = [
     url: 'https://tripwire-app.vercel.app/',
     tag: 'tool',
     builder: 'Zeitgeist Jones',
+    walletAddress: undefined,
     status: 'approved',
+    buildStatus: 'v1',
     submittedAt: 0,
   },
 ]
