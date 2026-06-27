@@ -25,10 +25,18 @@ const APPROVED_KEY = 'projects:approved'
 const PENDING_KEY  = 'projects:pending'
 
 export async function getApproved(): Promise<Project[]> {
+  const seedStatuses = await Promise.all(
+    SEED_PROJECTS.map(p => kv.get<string>(`buildstatus:${p.id}`))
+  )
+  const hydratedSeeds = SEED_PROJECTS.map((p, i) => ({
+    ...p,
+    buildStatus: (seedStatuses[i] ?? p.buildStatus) as BuildStatus,
+  }))
+
   const ids = await kv.lrange<string>(APPROVED_KEY, 0, -1)
-  if (!ids.length) return SEED_PROJECTS
+  if (!ids.length) return hydratedSeeds
   const projects = await Promise.all(ids.map(id => kv.get<Project>(`project:${id}`)))
-  return [...SEED_PROJECTS, ...(projects.filter(Boolean) as Project[])]
+  return [...hydratedSeeds, ...(projects.filter(Boolean) as Project[])]
 }
 
 export async function getPending(): Promise<Project[]> {
@@ -39,9 +47,11 @@ export async function getPending(): Promise<Project[]> {
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  // check seed projects first
   const seed = SEED_PROJECTS.find(p => p.id === id)
-  if (seed) return seed
+  if (seed) {
+    const overrideStatus = await kv.get<string>(`buildstatus:${id}`)
+    return { ...seed, buildStatus: (overrideStatus ?? seed.buildStatus) as BuildStatus }
+  }
   return kv.get<Project>(`project:${id}`)
 }
 
@@ -69,6 +79,10 @@ export async function rejectProject(id: string): Promise<void> {
 }
 
 export async function updateBuildStatus(id: string, buildStatus: BuildStatus): Promise<void> {
+  if (id.startsWith('seed-')) {
+    await kv.set(`buildstatus:${id}`, buildStatus)
+    return
+  }
   const project = await kv.get<Project>(`project:${id}`)
   if (!project) throw new Error('Project not found')
   await kv.set(`project:${id}`, { ...project, buildStatus })
