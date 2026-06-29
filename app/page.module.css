@@ -202,3 +202,36 @@
 }
 
 .footer a { color: #FF6B2B; }
+
+.comingSoonCard {
+  cursor: default;
+  opacity: 0.7;
+  background: #f5f5f5;
+  border-style: dashed;
+}
+
+.comingSoonCard:hover {
+  transform: none;
+  border-color: #e5e5e5;
+}
+
+.comingSoonBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: #111;
+  color: #fff;
+  text-transform: lowercase;
+}
+
+.teaser {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 6px;
+  font-style: italic;
+}

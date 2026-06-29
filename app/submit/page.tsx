@@ -109,8 +109,8 @@ export default function SubmitPage() {
 
         <div className={styles.field}>
           <label className={styles.label}>short description</label>
-          <textarea placeholder="What it does, in one or two sentences" value={form.desc} onChange={e => set('desc', e.target.value)} maxLength={120} rows={2} style={{ resize: 'none' }} />
-          <span className={styles.charCount}>{form.desc.length}/120</span>
+          <textarea placeholder="What it does, in a few sentences" value={form.desc} onChange={e => set('desc', e.target.value)} maxLength={240} rows={2} style={{ resize: 'none' }} />
+          <span className={styles.charCount}>{form.desc.length}/240</span>
         </div>
 
         <div className={styles.field}>

@@ -2,6 +2,12 @@ import { getApproved } from '@/lib/projects'
 import type { FeatureTag } from '@/lib/projects'
 import styles from './page.module.css'
 import Link from 'next/link'
+import { Redis } from '@upstash/redis'
+
+const kv = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+})
 
 const TAG_STYLE: Record<string, { bg: string; color: string }> = {
   tool:   { bg: '#FFF0E8', color: '#B04A10' },
@@ -18,13 +24,13 @@ const BUILD_STATUS_STYLE: Record<string, { bg: string; color: string; dot: strin
 }
 
 const FEATURE_TAG_STYLE: Record<string, { bg: string; color: string; icon: string }> = {
-  token_gate:       { bg: '#FFF0E8', color: '#B04A10', icon: '🔒' },
-  free_uses:        { bg: '#E8F4FF', color: '#1A5FA8', icon: '⚡' },
-  burns_clawd:      { bg: '#FFF0F0', color: '#AA2222', icon: '🔥' },
-  paid:             { bg: '#F0FFF0', color: '#1A6B2A', icon: '💵' },
-  free:             { bg: '#F0FFF0', color: '#1A6B2A', icon: '🌐' },
-  subject_to_change:{ bg: '#FFFFF0', color: '#7A6A00', icon: '⚠️' },
-  custom:           { bg: '#F5F5F5', color: '#555555', icon: '•' },
+  token_gate:        { bg: '#FFF0E8', color: '#B04A10', icon: '🔒' },
+  free_uses:         { bg: '#E8F4FF', color: '#1A5FA8', icon: '⚡' },
+  burns_clawd:       { bg: '#FFF0F0', color: '#AA2222', icon: '🔥' },
+  paid:              { bg: '#F0FFF0', color: '#1A6B2A', icon: '💵' },
+  free:              { bg: '#F0FFF0', color: '#1A6B2A', icon: '🌐' },
+  subject_to_change: { bg: '#FFFFF0', color: '#7A6A00', icon: '⚠️' },
+  custom:            { bg: '#F5F5F5', color: '#555555', icon: '•' },
 }
 
 function getBuildStatusStyle(status?: string) {
@@ -36,10 +42,21 @@ function initials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
+interface ComingSoonItem {
+  id: string
+  name: string
+  desc: string
+  emoji: string
+  teaser?: string
+}
+
 export const revalidate = 0
 
 export default async function Home() {
-  const projects = await getApproved()
+  const [projects, comingSoon] = await Promise.all([
+    getApproved(),
+    kv.get<ComingSoonItem[]>('coming-soon').then(r => r || []),
+  ])
 
   return (
     <main className={styles.wrap}>
@@ -92,6 +109,16 @@ export default async function Home() {
             </a>
           )
         })}
+
+        {comingSoon.map(p => (
+          <div key={p.id} className={`${styles.card} ${styles.comingSoonCard}`}>
+            <div className={styles.comingSoonBadge}>coming soon</div>
+            <span className={styles.emoji}>{p.emoji}</span>
+            <div className={styles.cardName}>{p.name}</div>
+            <div className={styles.cardDesc}>{p.desc}</div>
+            {p.teaser && <div className={styles.teaser}>{p.teaser}</div>}
+          </div>
+        ))}
 
         <Link href="/submit" className={`${styles.card} ${styles.addCard}`}>
           <span className={styles.addIcon}>＋</span>
