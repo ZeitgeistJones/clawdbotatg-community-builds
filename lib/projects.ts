@@ -9,14 +9,14 @@ export type BuildStatus = 'building' | 'beta' | 'v1' | 'offline' | string
 
 export interface FeatureTag {
   type: 'token_gate' | 'free_uses' | 'burns_clawd' | 'paid' | 'free' | 'subject_to_change' | 'custom'
-  label: string      // display label e.g. "10M CLAWD gate", "burns 5%", "$0.10/gen"
-  value?: string     // optional numeric/text value
+  label: string
+  value?: string
 }
 
 export interface ProjectMeta {
   buildStatus?: BuildStatus
   featureTags?: FeatureTag[]
-  manualTagsOverride?: boolean  // if true, skip auto-fetch and use manual tags only
+  manualTagsOverride?: boolean
 }
 
 export interface Project {
@@ -38,7 +38,6 @@ export interface Project {
 const APPROVED_KEY = 'projects:approved'
 const PENDING_KEY  = 'projects:pending'
 
-// Try to fetch live status from app's /api/status endpoint
 export async function fetchAppStatus(url: string): Promise<{ featureTags?: FeatureTag[]; buildStatus?: BuildStatus } | null> {
   try {
     const base = url.replace(/\/$/, '')
@@ -59,8 +58,8 @@ export async function getApproved(): Promise<Project[]> {
     let featureTags = meta?.featureTags ?? p.featureTags
     let buildStatus = (meta?.buildStatus ?? p.buildStatus) as BuildStatus
 
-    // auto-fetch if no manual override
-    if (!meta?.manualTagsOverride) {
+    // check both KV meta override AND seed-level flag
+    if (!meta?.manualTagsOverride && !p.manualTagsOverride) {
       const live = await fetchAppStatus(p.url)
       if (live) {
         if (live.featureTags && !featureTags) featureTags = live.featureTags
@@ -107,7 +106,7 @@ export async function getProject(id: string): Promise<Project | null> {
       ...seed,
       buildStatus: (meta?.buildStatus ?? seed.buildStatus) as BuildStatus,
       featureTags: meta?.featureTags ?? seed.featureTags,
-      manualTagsOverride: meta?.manualTagsOverride,
+      manualTagsOverride: meta?.manualTagsOverride ?? seed.manualTagsOverride,
     }
   }
   return kv.get<Project>(`project:${id}`)
@@ -159,9 +158,10 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'v1',
+    manualTagsOverride: true,
     featureTags: [
-      { type: 'free_uses', label: '2 free uses' },
-      { type: 'token_gate', label: '10M CLAWD gate' },
+      { type: 'free_uses', label: '2 free uses', value: '2 free uses' },
+      { type: 'token_gate', label: '10M CLAWD gate', value: '10M CLAWD' },
     ],
     submittedAt: 0,
   },
@@ -176,6 +176,7 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'building',
+    manualTagsOverride: true,
     featureTags: [
       { type: 'free', label: 'free to use' },
     ],
@@ -192,6 +193,7 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'v1',
+    manualTagsOverride: true,
     featureTags: [
       { type: 'free', label: 'free to use' },
     ],
@@ -208,8 +210,9 @@ const SEED_PROJECTS: Project[] = [
     walletAddress: '0xf2c44aF68aE2a983d1331b2D3aEF3c516Ae4a0Fc',
     status: 'approved',
     buildStatus: 'v1',
+    manualTagsOverride: true,
     featureTags: [
-      { type: 'token_gate', label: '10M CLAWD gate' },
+      { type: 'token_gate', label: '10M CLAWD gate', value: '10M CLAWD' },
     ],
     submittedAt: 0,
   },
