@@ -24,10 +24,13 @@ interface ComingSoonItem {
   desc: string
   emoji: string
   teaser?: string
+  url?: string
 }
 
 const BUILD_STATUSES = ['building', 'beta', 'v1', 'offline']
-const EMOJIS = ['🛠️','🗣️','👁️','📊','🔐','🎮','🌐','🤖','💎','🔥','⚡','🧠','🎯','🪄','🦾','⏳','🚀']
+const EMOJIS = ['⏳','🛠️','🗣️','👁️','📊','🔐','🎮','🌐','🤖','💎','🔥','⚡','🧠','🎯','🪄','🦾','🚀']
+
+const EMPTY_CS: ComingSoonItem = { id: '', name: '', desc: '', emoji: '⏳', teaser: '', url: '' }
 
 function AdminInner() {
   const params = useSearchParams()
@@ -42,9 +45,7 @@ function AdminInner() {
   const [tab, setTab] = useState<'pending' | 'approved' | 'coming-soon'>('pending')
   const [customStatus, setCustomStatus] = useState<Record<string, string>>({})
   const [savingCS, setSavingCS] = useState(false)
-
-  // new coming soon form
-  const [newCS, setNewCS] = useState({ name: '', desc: '', emoji: '⏳', teaser: '', url: '' })
+  const [editingCS, setEditingCS] = useState<ComingSoonItem | null>(null) // null = new form
 
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
@@ -85,7 +86,7 @@ function AdminInner() {
     setActing(null)
   }
 
-  async function saveComingSoon(items: ComingSoonItem[]) {
+  async function persistCS(items: ComingSoonItem[]) {
     setSavingCS(true)
     await fetch('/api/admin/coming-soon', {
       method: 'POST',
@@ -95,26 +96,25 @@ function AdminInner() {
     setSavingCS(false)
   }
 
-  function addComingSoon() {
-    if (!newCS.name) return
-    const item: ComingSoonItem = {
-      id: `cs-${Date.now()}`,
-      name: newCS.name,
-      desc: newCS.desc,
-      emoji: newCS.emoji,
-      teaser: newCS.teaser || undefined,
-        url: newCS.url || undefined,
+  function saveCSItem(item: ComingSoonItem) {
+    if (!item.name) return
+    let updated: ComingSoonItem[]
+    if (item.id && comingSoon.find(c => c.id === item.id)) {
+      // editing existing
+      updated = comingSoon.map(c => c.id === item.id ? item : c)
+    } else {
+      // new item
+      updated = [...comingSoon, { ...item, id: `cs-${Date.now()}` }]
     }
-    const updated = [...comingSoon, item]
     setComingSoon(updated)
-    saveComingSoon(updated)
-    setNewCS({ name: '', desc: '', emoji: '⏳', teaser: '', url: '' })
+    persistCS(updated)
+    setEditingCS(null)
   }
 
-  function removeComingSoon(id: string) {
+  function removeCS(id: string) {
     const updated = comingSoon.filter(c => c.id !== id)
     setComingSoon(updated)
-    saveComingSoon(updated)
+    persistCS(updated)
   }
 
   if (loading) return <div className={styles.center}>loading…</div>
@@ -142,84 +142,83 @@ function AdminInner() {
         </div>
       </div>
 
+      {/* PENDING */}
       {tab === 'pending' && (
-        pending.length === 0 ? (
-          <div className={styles.empty}><span>✅</span><p>nothing pending</p></div>
-        ) : (
-          <div className={styles.list}>
-            {pending.map(p => (
-              <div key={p.id} className={styles.card}>
-                <div className={styles.cardTop}>
-                  <span className={styles.emoji}>{p.emoji}</span>
-                  <div className={styles.cardInfo}>
-                    <div className={styles.cardName}>{p.name}</div>
-                    <div className={styles.cardBuilder}>by {p.builder}</div>
-                    {p.walletAddress && <div className={styles.cardWallet}>{p.walletAddress.slice(0,6)}…{p.walletAddress.slice(-4)}</div>}
-                    <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.cardUrl}>{p.url}</a>
+        pending.length === 0
+          ? <div className={styles.empty}><span>✅</span><p>nothing pending</p></div>
+          : <div className={styles.list}>
+              {pending.map(p => (
+                <div key={p.id} className={styles.card}>
+                  <div className={styles.cardTop}>
+                    <span className={styles.emoji}>{p.emoji}</span>
+                    <div className={styles.cardInfo}>
+                      <div className={styles.cardName}>{p.name}</div>
+                      <div className={styles.cardBuilder}>by {p.builder}</div>
+                      {p.walletAddress && <div className={styles.cardWallet}>{p.walletAddress.slice(0,6)}…{p.walletAddress.slice(-4)}</div>}
+                      <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.cardUrl}>{p.url}</a>
+                    </div>
+                    <span className={styles.tagPill}>{p.tag}</span>
                   </div>
-                  <span className={styles.tagPill}>{p.tag}</span>
+                  <p className={styles.cardDesc}>{p.desc}</p>
+                  <div className={styles.actions}>
+                    <button className={styles.approveBtn} onClick={() => act(p.id, 'approve')} disabled={acting === p.id}>
+                      {acting === p.id ? '…' : '✓ approve'}
+                    </button>
+                    <button className={styles.rejectBtn} onClick={() => act(p.id, 'reject')} disabled={acting === p.id}>
+                      {acting === p.id ? '…' : '✕ reject'}
+                    </button>
+                  </div>
                 </div>
-                <p className={styles.cardDesc}>{p.desc}</p>
-                <div className={styles.actions}>
-                  <button className={styles.approveBtn} onClick={() => act(p.id, 'approve')} disabled={acting === p.id}>
-                    {acting === p.id ? '…' : '✓ approve'}
-                  </button>
-                  <button className={styles.rejectBtn} onClick={() => act(p.id, 'reject')} disabled={acting === p.id}>
-                    {acting === p.id ? '…' : '✕ reject'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+              ))}
+            </div>
       )}
 
+      {/* APPROVED */}
       {tab === 'approved' && (
-        approved.length === 0 ? (
-          <div className={styles.empty}><span>📭</span><p>no approved projects in KV yet</p></div>
-        ) : (
-          <div className={styles.list}>
-            {approved.map(p => (
-              <div key={p.id} className={styles.card}>
-                <div className={styles.cardTop}>
-                  <span className={styles.emoji}>{p.emoji}</span>
-                  <div className={styles.cardInfo}>
-                    <div className={styles.cardName}>{p.name}</div>
-                    <div className={styles.cardBuilder}>by {p.builder}</div>
-                    <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.cardUrl}>{p.url}</a>
+        approved.length === 0
+          ? <div className={styles.empty}><span>📭</span><p>no approved projects in KV yet</p></div>
+          : <div className={styles.list}>
+              {approved.map(p => (
+                <div key={p.id} className={styles.card}>
+                  <div className={styles.cardTop}>
+                    <span className={styles.emoji}>{p.emoji}</span>
+                    <div className={styles.cardInfo}>
+                      <div className={styles.cardName}>{p.name}</div>
+                      <div className={styles.cardBuilder}>by {p.builder}</div>
+                      <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.cardUrl}>{p.url}</a>
+                    </div>
+                    <span className={styles.tagPill}>{p.tag}</span>
                   </div>
-                  <span className={styles.tagPill}>{p.tag}</span>
+                  <div className={styles.statusSection}>
+                    <div className={styles.statusLabel}>build status</div>
+                    <div className={styles.statusRow}>
+                      {BUILD_STATUSES.map(s => (
+                        <button key={s}
+                          className={`${styles.statusBtn} ${p.buildStatus === s ? styles.statusBtnActive : ''}`}
+                          onClick={() => updateStatus(p.id, s)}
+                          disabled={acting === p.id}>
+                          {s}
+                        </button>
+                      ))}
+                      <input type="text" placeholder="custom…" className={styles.customInput}
+                        value={customStatus[p.id] || ''}
+                        onChange={e => setCustomStatus(cs => ({ ...cs, [p.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter' && customStatus[p.id]) updateStatus(p.id, customStatus[p.id]) }}
+                      />
+                      {customStatus[p.id] && (
+                        <button className={styles.statusBtn} onClick={() => updateStatus(p.id, customStatus[p.id])}>set</button>
+                      )}
+                    </div>
+                    <div className={styles.editLink}>
+                      builder edit link: <a href={`/edit?id=${p.id}`} target="_blank" rel="noopener noreferrer">/edit?id={p.id}</a>
+                    </div>
+                  </div>
                 </div>
-                <div className={styles.statusSection}>
-                  <div className={styles.statusLabel}>build status</div>
-                  <div className={styles.statusRow}>
-                    {BUILD_STATUSES.map(s => (
-                      <button key={s}
-                        className={`${styles.statusBtn} ${p.buildStatus === s ? styles.statusBtnActive : ''}`}
-                        onClick={() => updateStatus(p.id, s)}
-                        disabled={acting === p.id}>
-                        {s}
-                      </button>
-                    ))}
-                    <input type="text" placeholder="custom…" className={styles.customInput}
-                      value={customStatus[p.id] || ''}
-                      onChange={e => setCustomStatus(cs => ({ ...cs, [p.id]: e.target.value }))}
-                      onKeyDown={e => { if (e.key === 'Enter' && customStatus[p.id]) updateStatus(p.id, customStatus[p.id]) }}
-                    />
-                    {customStatus[p.id] && (
-                      <button className={styles.statusBtn} onClick={() => updateStatus(p.id, customStatus[p.id])}>set</button>
-                    )}
-                  </div>
-                  <div className={styles.editLink}>
-                    builder edit link: <a href={`/edit?id=${p.id}`} target="_blank" rel="noopener noreferrer">/edit?id={p.id}</a>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+              ))}
+            </div>
       )}
 
+      {/* COMING SOON */}
       {tab === 'coming-soon' && (
         <div>
           {/* existing items */}
@@ -233,47 +232,83 @@ function AdminInner() {
                       <div className={styles.cardName}>{c.name}</div>
                       <div className={styles.cardBuilder}>{c.desc}</div>
                       {c.teaser && <div className={styles.cardWallet}>teaser: {c.teaser}</div>}
+                      {c.url && <div className={styles.cardWallet}>url: {c.url}</div>}
                     </div>
-                    <button className={styles.rejectBtn} onClick={() => removeComingSoon(c.id)}>remove</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <button className={styles.statusBtn} onClick={() => setEditingCS(c)}>edit</button>
+                      <button className={styles.rejectBtn} onClick={() => removeCS(c.id)}>remove</button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* add new */}
-          <div className={styles.card}>
-            <div className={styles.statusLabel} style={{ marginBottom: '12px' }}>add coming soon project</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <select value={newCS.emoji} onChange={e => setNewCS(n => ({ ...n, emoji: e.target.value }))}
-                  style={{ width: '70px', padding: '8px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '16px' }}>
-                  {EMOJIS.map(em => <option key={em} value={em}>{em}</option>)}
-                </select>
-                <input type="text" placeholder="project name" value={newCS.name}
-                  onChange={e => setNewCS(n => ({ ...n, name: e.target.value }))}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
-              </div>
-              <input type="text" placeholder="short description" value={newCS.desc}
-                onChange={e => setNewCS(n => ({ ...n, desc: e.target.value }))}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
-              <input type="text" placeholder="teaser text (optional) — e.g. 'drops this week'`} value={newCS.teaser}
-                onChange={e => setNewCS(n => ({ ...n, teaser: e.target.value }))}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
-              <input type="url" placeholder="site URL (optional) — for blurred preview" value={newCS.url}
-                onChange={e => setNewCS(n => ({ ...n, url: e.target.value }))}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit`" value={newCS.teaser}
-                onChange={e => setNewCS(n => ({ ...n, teaser: e.target.value }))}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
-              <button className={styles.approveBtn} onClick={addComingSoon} disabled={!newCS.name || savingCS}
-                style={{ alignSelf: 'flex-start' }}>
-                {savingCS ? 'saving…' : '+ add to hub'}
-              </button>
-            </div>
-          </div>
+          {/* add/edit form */}
+          <CSForm
+            initial={editingCS || { ...EMPTY_CS }}
+            isEditing={!!editingCS}
+            saving={savingCS}
+            emojis={EMOJIS}
+            onSave={saveCSItem}
+            onCancel={() => setEditingCS(null)}
+          />
         </div>
       )}
     </main>
+  )
+}
+
+function CSForm({ initial, isEditing, saving, emojis, onSave, onCancel }: {
+  initial: ComingSoonItem
+  isEditing: boolean
+  saving: boolean
+  emojis: string[]
+  onSave: (item: ComingSoonItem) => void
+  onCancel: () => void
+}) {
+  const [form, setForm] = useState<ComingSoonItem>(initial)
+
+  useEffect(() => { setForm(initial) }, [initial])
+
+  function set(field: keyof ComingSoonItem, value: string) {
+    setForm(f => ({ ...f, [field]: value }))
+  }
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.statusLabel} style={{ marginBottom: '12px' }}>
+        {isEditing ? `editing: ${initial.name}` : 'add coming soon project'}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <select value={form.emoji} onChange={e => set('emoji', e.target.value)}
+            style={{ width: '70px', padding: '8px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '16px', fontFamily: 'inherit' }}>
+            {emojis.map(em => <option key={em} value={em}>{em}</option>)}
+          </select>
+          <input type="text" placeholder="project name *" value={form.name}
+            onChange={e => set('name', e.target.value)}
+            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
+        </div>
+        <input type="text" placeholder="short description" value={form.desc}
+          onChange={e => set('desc', e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
+        <input type="text" placeholder="teaser (optional) — e.g. drops this week" value={form.teaser || ''}
+          onChange={e => set('teaser', e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
+        <input type="url" placeholder="site URL (optional) — shows blurred preview on card" value={form.url || ''}
+          onChange={e => set('url', e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className={styles.approveBtn} onClick={() => onSave(form)} disabled={!form.name || saving}>
+            {saving ? 'saving…' : isEditing ? 'save changes' : '+ add to hub'}
+          </button>
+          {isEditing && (
+            <button className={styles.rejectBtn} onClick={onCancel}>cancel</button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
