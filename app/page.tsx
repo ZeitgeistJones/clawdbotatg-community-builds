@@ -2,6 +2,7 @@ import { getApproved } from '@/lib/projects'
 import type { FeatureTag } from '@/lib/projects'
 import styles from './page.module.css'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Redis } from '@upstash/redis'
 import ComingSoonCard from './components/ComingSoonCard'
 
@@ -63,14 +64,15 @@ export default async function Home() {
   return (
     <main className={styles.wrap}>
       <header className={styles.header}>
-        <div className={styles.logo}>
-          <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-            <path d="M8 28 C8 28 12 20 14 14 C15 10 13 6 16 5 C19 4 20 8 18 13 C16 18 19 24 22 26" stroke="#111" strokeWidth="2.2" strokeLinecap="round"/>
-            <path d="M14 29 C14 29 16 22 17 16 C17.5 12 16 8 19 7 C22 6 22.5 10 21 15 C19.5 20 21 26 23 28" stroke="#111" strokeWidth="2.2" strokeLinecap="round"/>
-            <path d="M20 30 C20 30 20 23 20.5 17 C21 13 20 9 23 8 C26 7 26 11 25 16 C24 21 25 27 27 29" stroke="#111" strokeWidth="2.2" strokeLinecap="round"/>
-          </svg>
-          <span className={styles.title}>clawdbotatg community builds</span>
-        </div>
+        <Image
+          src="/clawd-logo.png"
+          alt="clawdbotatg community builds"
+          width={90}
+          height={90}
+          className={styles.logoImg}
+          priority
+        />
+        <h1 className={styles.title}>clawdbotatg community builds</h1>
         <p className={styles.subtitle}>stuff built by the community, for the community</p>
       </header>
 
