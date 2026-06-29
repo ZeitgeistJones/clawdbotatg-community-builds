@@ -12,6 +12,7 @@ export interface ComingSoonItem {
   desc: string
   emoji: string
   teaser?: string
+  url?: string
 }
 
 export async function GET(req: NextRequest) {

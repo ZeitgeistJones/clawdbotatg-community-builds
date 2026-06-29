@@ -44,7 +44,7 @@ function AdminInner() {
   const [savingCS, setSavingCS] = useState(false)
 
   // new coming soon form
-  const [newCS, setNewCS] = useState({ name: '', desc: '', emoji: '⏳', teaser: '' })
+  const [newCS, setNewCS] = useState({ name: '', desc: '', emoji: '⏳', teaser: '', url: '' })
 
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
@@ -103,11 +103,12 @@ function AdminInner() {
       desc: newCS.desc,
       emoji: newCS.emoji,
       teaser: newCS.teaser || undefined,
+        url: newCS.url || undefined,
     }
     const updated = [...comingSoon, item]
     setComingSoon(updated)
     saveComingSoon(updated)
-    setNewCS({ name: '', desc: '', emoji: '⏳', teaser: '' })
+    setNewCS({ name: '', desc: '', emoji: '⏳', teaser: '', url: '' })
   }
 
   function removeComingSoon(id: string) {
@@ -256,7 +257,12 @@ function AdminInner() {
               <input type="text" placeholder="short description" value={newCS.desc}
                 onChange={e => setNewCS(n => ({ ...n, desc: e.target.value }))}
                 style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
-              <input type="text" placeholder="teaser text (optional) — e.g. 'drops this week'" value={newCS.teaser}
+              <input type="text" placeholder="teaser text (optional) — e.g. 'drops this week'`} value={newCS.teaser}
+                onChange={e => setNewCS(n => ({ ...n, teaser: e.target.value }))}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
+              <input type="url" placeholder="site URL (optional) — for blurred preview" value={newCS.url}
+                onChange={e => setNewCS(n => ({ ...n, url: e.target.value }))}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit`" value={newCS.teaser}
                 onChange={e => setNewCS(n => ({ ...n, teaser: e.target.value }))}
                 style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
               <button className={styles.approveBtn} onClick={addComingSoon} disabled={!newCS.name || savingCS}

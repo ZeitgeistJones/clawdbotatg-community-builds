@@ -1,0 +1,106 @@
+.card {
+  position: relative;
+  border: 1px dashed #ccc;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+  background: #f0f0f0;
+}
+
+.iframeWrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.iframe {
+  width: 250%;
+  height: 250%;
+  transform: scale(0.4);
+  transform-origin: top left;
+  border: none;
+  pointer-events: none;
+  filter: blur(6px) saturate(0.6);
+  opacity: 0.7;
+}
+
+.iframeOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.fallbackBg {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    #e8e8e8,
+    #e8e8e8 4px,
+    #f5f5f5 4px,
+    #f5f5f5 16px
+  );
+  filter: blur(2px);
+  opacity: 0.6;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  padding: 1.1rem 1rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+.badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: #111;
+  color: #fff;
+  text-transform: lowercase;
+}
+
+.emoji {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 0.6rem;
+  display: block;
+  margin-top: 1.4rem;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15));
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111;
+  line-height: 1.25;
+  margin-bottom: 3px;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+}
+
+.desc {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+}
+
+.teaser {
+  font-size: 11px;
+  color: #888;
+  margin-top: 6px;
+  font-style: italic;
+}

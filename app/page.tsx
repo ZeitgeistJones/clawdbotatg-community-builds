@@ -3,6 +3,7 @@ import type { FeatureTag } from '@/lib/projects'
 import styles from './page.module.css'
 import Link from 'next/link'
 import { Redis } from '@upstash/redis'
+import ComingSoonCard from './components/ComingSoonCard'
 
 const kv = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -48,6 +49,7 @@ interface ComingSoonItem {
   desc: string
   emoji: string
   teaser?: string
+  url?: string
 }
 
 export const revalidate = 0
@@ -110,14 +112,8 @@ export default async function Home() {
           )
         })}
 
-        {comingSoon.map(p => (
-          <div key={p.id} className={`${styles.card} ${styles.comingSoonCard}`}>
-            <div className={styles.comingSoonBadge}>coming soon</div>
-            <span className={styles.emoji}>{p.emoji}</span>
-            <div className={styles.cardName}>{p.name}</div>
-            <div className={styles.cardDesc}>{p.desc}</div>
-            {p.teaser && <div className={styles.teaser}>{p.teaser}</div>}
-          </div>
+        {comingSoon.map(item => (
+          <ComingSoonCard key={item.id} item={item} />
         ))}
 
         <Link href="/submit" className={`${styles.card} ${styles.addCard}`}>
