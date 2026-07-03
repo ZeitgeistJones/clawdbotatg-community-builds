@@ -40,8 +40,8 @@ const PENDING_KEY  = 'projects:pending'
 const REMOVED_KEY  = 'projects:removed'
 
 async function getRemovedIds(): Promise<Set<string>> {
-  const ids = await kv.smembers<string>(REMOVED_KEY)
-  return new Set(ids || [])
+  const ids = await kv.smembers(REMOVED_KEY)
+  return new Set((ids as string[]) || [])
 }
 
 export async function fetchAppStatus(url: string): Promise<{ featureTags?: FeatureTag[]; buildStatus?: BuildStatus } | null> {
