@@ -86,6 +86,18 @@ function AdminInner() {
     setActing(null)
   }
 
+  async function removeApproved(id: string) {
+    if (!confirm('Remove this project from the hub?')) return
+    setActing(id)
+    const res = await fetch('/api/admin/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, key }),
+    })
+    if (res.ok) setApproved(a => a.filter(p => p.id !== id))
+    setActing(null)
+  }
+
   async function persistCS(items: ComingSoonItem[]) {
     setSavingCS(true)
     await fetch('/api/admin/coming-soon', {
@@ -176,18 +188,30 @@ function AdminInner() {
       {/* APPROVED */}
       {tab === 'approved' && (
         approved.length === 0
-          ? <div className={styles.empty}><span>📭</span><p>no approved projects in KV yet</p></div>
+          ? <div className={styles.empty}><span>📭</span><p>no live projects on the hub</p></div>
           : <div className={styles.list}>
               {approved.map(p => (
                 <div key={p.id} className={styles.card}>
                   <div className={styles.cardTop}>
                     <span className={styles.emoji}>{p.emoji}</span>
                     <div className={styles.cardInfo}>
-                      <div className={styles.cardName}>{p.name}</div>
+                      <div className={styles.cardName}>
+                        {p.name}
+                        {p.id.startsWith('seed-') && <span className={styles.seedBadge}>original</span>}
+                      </div>
                       <div className={styles.cardBuilder}>by {p.builder}</div>
                       <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.cardUrl}>{p.url}</a>
                     </div>
-                    <span className={styles.tagPill}>{p.tag}</span>
+                    <div className={styles.cardActions}>
+                      <span className={styles.tagPill}>{p.tag}</span>
+                      <button
+                        className={styles.rejectBtn}
+                        onClick={() => removeApproved(p.id)}
+                        disabled={acting === p.id}
+                      >
+                        {acting === p.id ? '…' : 'remove'}
+                      </button>
+                    </div>
                   </div>
                   <div className={styles.statusSection}>
                     <div className={styles.statusLabel}>build status</div>

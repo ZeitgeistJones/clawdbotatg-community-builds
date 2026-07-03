@@ -37,6 +37,12 @@ export interface Project {
 
 const APPROVED_KEY = 'projects:approved'
 const PENDING_KEY  = 'projects:pending'
+const REMOVED_KEY  = 'projects:removed'
+
+async function getRemovedIds(): Promise<Set<string>> {
+  const ids = await kv.smembers<string>(REMOVED_KEY)
+  return new Set(ids || [])
+}
 
 export async function fetchAppStatus(url: string): Promise<{ featureTags?: FeatureTag[]; buildStatus?: BuildStatus } | null> {
   try {
@@ -50,10 +56,12 @@ export async function fetchAppStatus(url: string): Promise<{ featureTags?: Featu
 }
 
 export async function getApproved(): Promise<Project[]> {
+  const removed = await getRemovedIds()
+
   const seedMetas = await Promise.all(
     SEED_PROJECTS.map(p => kv.get<ProjectMeta>(`meta:${p.id}`))
   )
-  const hydratedSeeds = await Promise.all(SEED_PROJECTS.map(async (p, i) => {
+  const hydratedSeeds = (await Promise.all(SEED_PROJECTS.map(async (p, i) => {
     const meta = seedMetas[i]
     let featureTags = meta?.featureTags ?? p.featureTags
     let buildStatus = (meta?.buildStatus ?? p.buildStatus) as BuildStatus
@@ -68,7 +76,7 @@ export async function getApproved(): Promise<Project[]> {
     }
 
     return { ...p, buildStatus, featureTags }
-  }))
+  }))).filter(p => !removed.has(p.id))
 
   const ids = await kv.lrange<string>(APPROVED_KEY, 0, -1)
   if (!ids.length) return hydratedSeeds
@@ -88,7 +96,7 @@ export async function getApproved(): Promise<Project[]> {
     return p
   }))
 
-  return [...hydratedSeeds, ...kvProjects]
+  return [...hydratedSeeds, ...kvProjects.filter(p => !removed.has(p.id))]
 }
 
 export async function getPending(): Promise<Project[]> {
@@ -98,7 +106,26 @@ export async function getPending(): Promise<Project[]> {
   return projects.filter(Boolean) as Project[]
 }
 
+export async function removeProject(id: string): Promise<void> {
+  const removed = await getRemovedIds()
+  if (removed.has(id)) return
+
+  if (id.startsWith('seed-')) {
+    if (!SEED_PROJECTS.some(p => p.id === id)) throw new Error('Project not found')
+    await kv.sadd(REMOVED_KEY, id)
+    return
+  }
+
+  const project = await kv.get<Project>(`project:${id}`)
+  if (!project) throw new Error('Project not found')
+  await kv.lrem(APPROVED_KEY, 0, id)
+  await kv.sadd(REMOVED_KEY, id)
+}
+
 export async function getProject(id: string): Promise<Project | null> {
+  const removed = await getRemovedIds()
+  if (removed.has(id)) return null
+
   const seed = SEED_PROJECTS.find(p => p.id === id)
   if (seed) {
     const meta = await kv.get<ProjectMeta>(`meta:${id}`)
