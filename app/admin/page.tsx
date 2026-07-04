@@ -121,43 +121,41 @@ function AdminInner() {
   async function syncBurns(fullBackfill: boolean) {
     setSyncingBurns(true)
     setBurnError(null)
-    setBurnStatus(fullBackfill ? 'scanning…' : 'syncing…')
+    setBurnStatus(fullBackfill ? 'running one batch…' : 'syncing…')
 
     try {
-      let complete = false
-      do {
-        const res = await fetch('/api/admin/backfill-burns', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, fullBackfill }),
-        })
-        const data = await res.json()
-        if (!res.ok) {
-          setBurnError(data.error || 'Sync failed — check Vercel logs')
-          break
-        }
+      const res = await fetch('/api/admin/backfill-burns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, fullBackfill }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setBurnError(data.error || 'Sync failed — wait 2–3 min if rate limited')
+        return
+      }
 
-        setBurnTotal(data.formatted)
-        setRescoreTotal(data.rescores ?? 0)
-        const pending = (data.results || []).filter((r: { scanComplete: boolean }) => !r.scanComplete)
-        if (pending.length > 0) {
-          const r = pending[0]
-          setBurnStatus(`scanning block ${r.scannedTo}…`)
-        } else {
-          setBurnStatus(null)
-        }
-        complete = !fullBackfill || (data.results || []).every((r: { scanComplete: boolean }) => r.scanComplete)
+      setBurnTotal(data.formatted)
+      setRescoreTotal(data.rescores ?? 0)
 
-        const stats = await fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.json())
-        const map: Record<string, string> = {}
-        const rMap: Record<string, number> = {}
-        for (const row of stats.byApp || []) {
-          map[row.projectId] = row.formatted
-          rMap[row.projectId] = row.rescores ?? 0
-        }
-        setBurnByApp(map)
-        setRescoresByApp(rMap)
-      } while (fullBackfill && !complete)
+      const r = data.results?.[0]
+      if (r?.rescorePagesRemaining) {
+        setBurnStatus('rescores: click backfill again for next page')
+      } else if (r && !r.scanComplete) {
+        setBurnStatus(`burn logs at block ${r.scannedTo} — click backfill again`)
+      } else {
+        setBurnStatus('sync complete')
+      }
+
+      const stats = await fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.json())
+      const map: Record<string, string> = {}
+      const rMap: Record<string, number> = {}
+      for (const row of stats.byApp || []) {
+        map[row.projectId] = row.formatted
+        rMap[row.projectId] = row.rescores ?? 0
+      }
+      setBurnByApp(map)
+      setRescoresByApp(rMap)
     } catch {
       setBurnError('Network error during sync')
     }
