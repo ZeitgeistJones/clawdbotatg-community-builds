@@ -33,6 +33,13 @@
   color: var(--text-muted);
 }
 
+.burnCounter {
+  font-size: 13px;
+  font-weight: 600;
+  color: #AA2222;
+  margin-top: 0.5rem;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

@@ -1,5 +1,6 @@
 import { getApproved } from '@/lib/projects'
 import type { FeatureTag } from '@/lib/projects'
+import { getBurnTotal } from '@/lib/burnIndexer'
 import styles from './page.module.css'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -56,9 +57,10 @@ interface ComingSoonItem {
 export const revalidate = 0
 
 export default async function Home() {
-  const [projects, comingSoon] = await Promise.all([
+  const [projects, comingSoon, burns] = await Promise.all([
     getApproved(),
     kv.get<ComingSoonItem[]>('coming-soon').then(r => r || []),
+    getBurnTotal(),
   ])
 
   return (
@@ -74,6 +76,9 @@ export default async function Home() {
         />
         <h1 className={styles.title}>clawdbotatg community builds</h1>
         <p className={styles.subtitle}>stuff built by the community, for the community</p>
+        {burns.wei > 0n && (
+          <p className={styles.burnCounter}>🔥 {burns.formatted} CLAWD burned by community apps</p>
+        )}
       </header>
 
       <div className={styles.grid}>

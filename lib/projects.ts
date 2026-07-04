@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis"
+import type { BurnConfig } from "./burnConfig"
 const kv = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
@@ -12,6 +13,8 @@ export interface FeatureTag {
   label: string
   value?: string
 }
+
+export type { BurnConfig } from "./burnConfig"
 
 export interface ProjectMeta {
   buildStatus?: BuildStatus
@@ -32,6 +35,7 @@ export interface Project {
   buildStatus?: BuildStatus
   featureTags?: FeatureTag[]
   manualTagsOverride?: boolean
+  burnConfig?: BurnConfig
   submittedAt: number
 }
 

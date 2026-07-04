@@ -46,6 +46,9 @@ function AdminInner() {
   const [customStatus, setCustomStatus] = useState<Record<string, string>>({})
   const [savingCS, setSavingCS] = useState(false)
   const [editingCS, setEditingCS] = useState<ComingSoonItem | null>(null) // null = new form
+  const [burnTotal, setBurnTotal] = useState<string | null>(null)
+  const [burnByApp, setBurnByApp] = useState<Record<string, string>>({})
+  const [syncingBurns, setSyncingBurns] = useState(false)
 
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
@@ -57,10 +60,17 @@ function AdminInner() {
       }),
       fetch(`/api/admin/approved?key=${key}`).then(r => r.ok ? r.json() : []),
       fetch(`/api/admin/coming-soon?key=${key}`).then(r => r.ok ? r.json() : []),
-    ]).then(([pendingData, approvedData, csData]) => {
+      fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.ok ? r.json() : null),
+    ]).then(([pendingData, approvedData, csData, burnData]) => {
       if (pendingData) setPending(pendingData)
       if (approvedData) setApproved(approvedData)
       if (csData) setComingSoon(csData)
+      if (burnData) {
+        setBurnTotal(burnData.formatted)
+        const map: Record<string, string> = {}
+        for (const row of burnData.byApp || []) map[row.projectId] = row.formatted
+        setBurnByApp(map)
+      }
     }).finally(() => setLoading(false))
   }, [key])
 
@@ -96,6 +106,24 @@ function AdminInner() {
     })
     if (res.ok) setApproved(a => a.filter(p => p.id !== id))
     setActing(null)
+  }
+
+  async function syncBurns(fullBackfill: boolean) {
+    setSyncingBurns(true)
+    const res = await fetch('/api/admin/backfill-burns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, fullBackfill }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setBurnTotal(data.formatted)
+      const stats = await fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.json())
+      const map: Record<string, string> = {}
+      for (const row of stats.byApp || []) map[row.projectId] = row.formatted
+      setBurnByApp(map)
+    }
+    setSyncingBurns(false)
   }
 
   async function persistCS(items: ComingSoonItem[]) {
@@ -141,6 +169,19 @@ function AdminInner() {
     <main className={styles.wrap}>
       <div className={styles.header}>
         <h1 className={styles.title}>admin panel</h1>
+        {auth && (
+          <div className={styles.burnBar}>
+            <span>🔥 {burnTotal ?? '…'} CLAWD burned (tracked apps)</span>
+            <div className={styles.burnActions}>
+              <button className={styles.statusBtn} onClick={() => syncBurns(false)} disabled={syncingBurns}>
+                {syncingBurns ? '…' : 'sync'}
+              </button>
+              <button className={styles.statusBtn} onClick={() => syncBurns(true)} disabled={syncingBurns}>
+                {syncingBurns ? '…' : 'backfill'}
+              </button>
+            </div>
+          </div>
+        )}
         <div className={styles.tabs}>
           <button className={`${styles.tab} ${tab === 'pending' ? styles.tabActive : ''}`} onClick={() => setTab('pending')}>
             pending {pending.length > 0 && <span className={styles.badge}>{pending.length}</span>}
@@ -236,6 +277,9 @@ function AdminInner() {
                     <div className={styles.editLink}>
                       builder edit link: <a href={`/edit?id=${p.id}`} target="_blank" rel="noopener noreferrer">/edit?id={p.id}</a>
                     </div>
+                    {burnByApp[p.id] && (
+                      <div className={styles.burnAppTotal}>🔥 {burnByApp[p.id]} CLAWD burned</div>
+                    )}
                   </div>
                 </div>
               ))}
