@@ -20,6 +20,7 @@ const BACKFILL_MAX_BLOCKS = 200n
 const RESCORE_PAYMENT_WEI = 8000000000000n
 
 export const BURNS_TOTAL_KEY = 'burns:total'
+export const BURNS_LAST_UPDATED_KEY = 'burns:lastUpdated'
 export const RESCORES_TOTAL_KEY = 'burns:rescores:total'
 
 const lastBlockKey = (projectId: string) => `burns:lastBlock:${projectId}`
@@ -73,6 +74,10 @@ export async function getBurnTotal(): Promise<{ wei: bigint; formatted: string }
   const raw = await kv.get<string>(BURNS_TOTAL_KEY)
   const wei = BigInt(raw || '0')
   return { wei, formatted: formatClawdAmount(wei) }
+}
+
+export async function getBurnLastUpdated(): Promise<number | null> {
+  return (await kv.get<number>(BURNS_LAST_UPDATED_KEY)) || null
 }
 
 export async function getRescoreTotal(): Promise<number> {
@@ -345,6 +350,10 @@ export async function syncAllBurns(options?: { fullBackfill?: boolean }): Promis
   for (const project of projects) {
     const result = await syncProjectBurns(project, options)
     if (result) results.push(result)
+  }
+
+  if (results.length > 0) {
+    await kv.set(BURNS_LAST_UPDATED_KEY, Date.now())
   }
 
   return results

@@ -33,11 +33,20 @@
   color: var(--text-muted);
 }
 
+.burnStats {
+  margin-top: 0.5rem;
+}
+
 .burnCounter {
   font-size: 13px;
   font-weight: 600;
   color: #AA2222;
-  margin-top: 0.5rem;
+}
+
+.burnUpdated {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .grid {
