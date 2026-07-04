@@ -76,7 +76,7 @@ export default async function Home() {
         />
         <h1 className={styles.title}>clawdbotatg community builds</h1>
         <p className={styles.subtitle}>stuff built by the community, for the community</p>
-        {burns.wei > 0n && (
+        {burns.wei > BigInt(0) && (
           <p className={styles.burnCounter}>🔥 {burns.formatted} CLAWD burned by community apps</p>
         )}
       </header>
