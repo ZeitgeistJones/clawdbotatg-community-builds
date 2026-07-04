@@ -287,12 +287,11 @@ export async function syncProjectBurns(
 
   const pagesLeft = await rescorePagesRemaining(project.id)
 
-  // One job per click: finish rescore pages first (1 Alchemy call), then burn logs
-  let newRescores = 0
-  if (pagesLeft || options?.fullBackfill) {
+  // Backfill: one Alchemy call per click until rescores are indexed
+  if (options?.fullBackfill) {
     const pageState = await kv.get<string>(rescorePageKey(project.id))
     if (pageState !== 'done') {
-      newRescores = await syncRescorePage(
+      const newRescores = await syncRescorePage(
         project.id,
         config.receiverAddress,
         paymentWei,
@@ -307,7 +306,7 @@ export async function syncProjectBurns(
         newRescores,
         scannedFrom: Number(startBlock),
         scannedTo: Number(latestBlock),
-        scanComplete: !stillLeft && false,
+        scanComplete: !stillLeft,
         rescorePagesRemaining: stillLeft,
       }
     }
@@ -378,7 +377,7 @@ export async function syncProjectBurns(
     projectId: project.id,
     name: project.name,
     newBurns,
-    newRescores,
+    newRescores: 0,
     scannedFrom: Number(fromBlock),
     scannedTo: Number(toBlock),
     scanComplete: burnScanComplete,
