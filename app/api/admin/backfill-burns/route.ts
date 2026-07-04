@@ -12,10 +12,19 @@ export async function POST(req: NextRequest) {
   try {
     const results = await syncAllBurns({ fullBackfill: !!fullBackfill })
     const total = await getBurnTotal()
-    return NextResponse.json({ ok: true, results, total: total.wei.toString(), formatted: total.formatted })
+    return NextResponse.json({
+      ok: true,
+      results: results.map(r => ({
+        ...r,
+        newBurns: r.newBurns.toString(),
+      })),
+      total: total.wei.toString(),
+      formatted: total.formatted,
+    })
   } catch (err) {
     console.error('backfill-burns failed:', err)
-    return NextResponse.json({ error: 'Backfill failed' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Backfill failed'
+    return NextResponse.json({ error: message.slice(0, 200) }, { status: 500 })
   }
 }
 

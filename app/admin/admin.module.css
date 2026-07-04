@@ -205,6 +205,18 @@
   margin-top: 6px;
 }
 
+.burnStatus {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.burnError {
+  font-size: 11px;
+  color: #AA2222;
+  margin-top: 4px;
+}
+
 .tabs {
   display: flex;
   gap: 6px;

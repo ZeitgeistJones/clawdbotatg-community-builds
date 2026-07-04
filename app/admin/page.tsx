@@ -49,6 +49,8 @@ function AdminInner() {
   const [burnTotal, setBurnTotal] = useState<string | null>(null)
   const [burnByApp, setBurnByApp] = useState<Record<string, string>>({})
   const [syncingBurns, setSyncingBurns] = useState(false)
+  const [burnStatus, setBurnStatus] = useState<string | null>(null)
+  const [burnError, setBurnError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
@@ -110,19 +112,42 @@ function AdminInner() {
 
   async function syncBurns(fullBackfill: boolean) {
     setSyncingBurns(true)
-    const res = await fetch('/api/admin/backfill-burns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, fullBackfill }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      setBurnTotal(data.formatted)
-      const stats = await fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.json())
-      const map: Record<string, string> = {}
-      for (const row of stats.byApp || []) map[row.projectId] = row.formatted
-      setBurnByApp(map)
+    setBurnError(null)
+    setBurnStatus(fullBackfill ? 'scanning…' : 'syncing…')
+
+    try {
+      let complete = false
+      do {
+        const res = await fetch('/api/admin/backfill-burns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, fullBackfill }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setBurnError(data.error || 'Sync failed — check Vercel logs')
+          break
+        }
+
+        setBurnTotal(data.formatted)
+        const pending = (data.results || []).filter((r: { scanComplete: boolean }) => !r.scanComplete)
+        if (pending.length > 0) {
+          const r = pending[0]
+          setBurnStatus(`scanning block ${r.scannedTo}… click backfill again or wait`)
+        } else {
+          setBurnStatus(null)
+        }
+        complete = !fullBackfill || (data.results || []).every((r: { scanComplete: boolean }) => r.scanComplete)
+
+        const stats = await fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.json())
+        const map: Record<string, string> = {}
+        for (const row of stats.byApp || []) map[row.projectId] = row.formatted
+        setBurnByApp(map)
+      } while (fullBackfill && !complete)
+    } catch {
+      setBurnError('Network error during sync')
     }
+
     setSyncingBurns(false)
   }
 
@@ -182,6 +207,8 @@ function AdminInner() {
             </div>
           </div>
         )}
+        {burnStatus && <div className={styles.burnStatus}>{burnStatus}</div>}
+        {burnError && <div className={styles.burnError}>{burnError}</div>}
         <div className={styles.tabs}>
           <button className={`${styles.tab} ${tab === 'pending' ? styles.tabActive : ''}`} onClick={() => setTab('pending')}>
             pending {pending.length > 0 && <span className={styles.badge}>{pending.length}</span>}

@@ -14,7 +14,7 @@ export const BURN_APP_CONFIGS: Record<string, BurnConfig> = {
   'the-build-report.vercel.app': {
     receiverAddress: '0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad',
     paymentEth: '0.000008',
-    startBlock: 48100000,
+    startBlock: 48162000,
   },
 }
 

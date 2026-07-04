@@ -13,10 +13,14 @@ const TRANSFER_EVENT = parseAbiItem(
   'event Transfer(address indexed from, address indexed to, uint256 value)',
 )
 
-const BLOCK_CHUNK = 2000n
+/** Alchemy free tier limits eth_getLogs to 10 blocks per request */
+const BLOCK_CHUNK = 10n
+/** Blocks to scan per backfill invocation (avoids serverless timeout) */
+const BACKFILL_MAX_BLOCKS = 500n
 
 export const BURNS_TOTAL_KEY = 'burns:total'
 const lastBlockKey = (projectId: string) => `burns:lastBlock:${projectId}`
+const scanCursorKey = (projectId: string) => `burns:scanCursor:${projectId}`
 const byAppKey = (projectId: string) => `burns:by-app:${projectId}`
 const txsKey = (projectId: string) => `burns:txs:${projectId}`
 
@@ -44,12 +48,14 @@ export async function getBurnByApp(projectId: string): Promise<bigint> {
   return BigInt(raw || '0')
 }
 
-interface SyncResult {
+export interface SyncResult {
   projectId: string
   name: string
   newBurns: bigint
   rescans: number
-  toBlock: number
+  scannedFrom: number
+  scannedTo: number
+  scanComplete: boolean
 }
 
 async function fetchTransferLogs(
@@ -77,6 +83,31 @@ async function fetchTransferLogs(
   return logs
 }
 
+async function processLogs(projectId: string, logs: Awaited<ReturnType<typeof fetchTransferLogs>>) {
+  let newBurns = 0n
+  let rescans = 0
+
+  for (const log of logs) {
+    const txHash = log.transactionHash
+    const already = await kv.sismember(txsKey(projectId), txHash)
+    if (already) continue
+
+    const value = log.args.value ?? 0n
+    newBurns += value
+    rescans += 1
+    await kv.sadd(txsKey(projectId), txHash)
+  }
+
+  if (newBurns > 0n) {
+    const appTotal = BigInt((await kv.get<string>(byAppKey(projectId))) || '0') + newBurns
+    const hubTotal = BigInt((await kv.get<string>(BURNS_TOTAL_KEY)) || '0') + newBurns
+    await kv.set(byAppKey(projectId), appTotal.toString())
+    await kv.set(BURNS_TOTAL_KEY, hubTotal.toString())
+  }
+
+  return { newBurns, rescans }
+}
+
 export async function syncProjectBurns(
   project: Project,
   options?: { fullBackfill?: boolean },
@@ -89,11 +120,18 @@ export async function syncProjectBurns(
   const startBlock = BigInt(config.startBlock ?? 0)
 
   let fromBlock: bigint
+  let toBlock: bigint
+
   if (options?.fullBackfill) {
-    fromBlock = startBlock
+    const cursor = await kv.get<number>(scanCursorKey(project.id))
+    fromBlock = cursor != null ? BigInt(cursor) : startBlock
+    toBlock = fromBlock + BACKFILL_MAX_BLOCKS - 1n > latestBlock
+      ? latestBlock
+      : fromBlock + BACKFILL_MAX_BLOCKS - 1n
   } else {
     const cursor = await kv.get<number>(lastBlockKey(project.id))
     fromBlock = cursor != null ? BigInt(cursor + 1) : startBlock
+    toBlock = latestBlock
   }
 
   if (fromBlock > latestBlock) {
@@ -102,41 +140,36 @@ export async function syncProjectBurns(
       name: project.name,
       newBurns: 0n,
       rescans: 0,
-      toBlock: Number(latestBlock),
+      scannedFrom: Number(fromBlock),
+      scannedTo: Number(latestBlock),
+      scanComplete: true,
     }
   }
 
-  const logs = await fetchTransferLogs(client, config.receiverAddress, fromBlock, latestBlock)
+  const logs = await fetchTransferLogs(client, config.receiverAddress, fromBlock, toBlock)
+  const { newBurns, rescans } = await processLogs(project.id, logs)
 
-  let newBurns = 0n
-  let rescans = 0
+  const scanComplete = toBlock >= latestBlock
 
-  for (const log of logs) {
-    const txHash = log.transactionHash
-    const already = await kv.sismember(txsKey(project.id), txHash)
-    if (already) continue
-
-    const value = log.args.value ?? 0n
-    newBurns += value
-    rescans += 1
-    await kv.sadd(txsKey(project.id), txHash)
+  if (options?.fullBackfill) {
+    if (scanComplete) {
+      await kv.del(scanCursorKey(project.id))
+      await kv.set(lastBlockKey(project.id), Number(latestBlock))
+    } else {
+      await kv.set(scanCursorKey(project.id), Number(toBlock + 1n))
+    }
+  } else {
+    await kv.set(lastBlockKey(project.id), Number(latestBlock))
   }
-
-  if (newBurns > 0n) {
-    const appTotal = BigInt((await kv.get<string>(byAppKey(project.id))) || '0') + newBurns
-    const hubTotal = BigInt((await kv.get<string>(BURNS_TOTAL_KEY)) || '0') + newBurns
-    await kv.set(byAppKey(project.id), appTotal.toString())
-    await kv.set(BURNS_TOTAL_KEY, hubTotal.toString())
-  }
-
-  await kv.set(lastBlockKey(project.id), Number(latestBlock))
 
   return {
     projectId: project.id,
     name: project.name,
     newBurns,
     rescans,
-    toBlock: Number(latestBlock),
+    scannedFrom: Number(fromBlock),
+    scannedTo: Number(toBlock),
+    scanComplete,
   }
 }
 
