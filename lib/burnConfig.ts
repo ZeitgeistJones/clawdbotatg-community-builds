@@ -1,6 +1,11 @@
 export interface BurnConfig {
   receiverAddress: `0x${string}`
-  paymentEth?: string
+  /** Uniswap V3 pool — primary `from` on CLAWD→dead during execute() */
+  poolAddress?: `0x${string}`
+  /** execute() selector on receiver contract */
+  executeSelector?: string
+  /** Rescore payment in wei (0.000008 ETH) */
+  rescorePaymentWei?: bigint
   startBlock?: number
 }
 
@@ -13,8 +18,10 @@ export const DEAD_ADDRESS = '0x000000000000000000000000000000000000dEaD' as cons
 export const BURN_APP_CONFIGS: Record<string, BurnConfig> = {
   'the-build-report.vercel.app': {
     receiverAddress: '0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad',
-    paymentEth: '0.000008',
-    startBlock: 48162000,
+    poolAddress: '0xCD55381a53da35Ab1D7Bc5e3fE5F76cac976FAc3',
+    executeSelector: '0x61461954',
+    rescorePaymentWei: 8000000000000n,
+    startBlock: 48130514,
   },
 }
 

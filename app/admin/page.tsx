@@ -47,7 +47,9 @@ function AdminInner() {
   const [savingCS, setSavingCS] = useState(false)
   const [editingCS, setEditingCS] = useState<ComingSoonItem | null>(null) // null = new form
   const [burnTotal, setBurnTotal] = useState<string | null>(null)
+  const [rescoreTotal, setRescoreTotal] = useState<number | null>(null)
   const [burnByApp, setBurnByApp] = useState<Record<string, string>>({})
+  const [rescoresByApp, setRescoresByApp] = useState<Record<string, number>>({})
   const [syncingBurns, setSyncingBurns] = useState(false)
   const [burnStatus, setBurnStatus] = useState<string | null>(null)
   const [burnError, setBurnError] = useState<string | null>(null)
@@ -69,9 +71,15 @@ function AdminInner() {
       if (csData) setComingSoon(csData)
       if (burnData) {
         setBurnTotal(burnData.formatted)
+        setRescoreTotal(burnData.rescores ?? 0)
         const map: Record<string, string> = {}
-        for (const row of burnData.byApp || []) map[row.projectId] = row.formatted
+        const rMap: Record<string, number> = {}
+        for (const row of burnData.byApp || []) {
+          map[row.projectId] = row.formatted
+          rMap[row.projectId] = row.rescores ?? 0
+        }
         setBurnByApp(map)
+        setRescoresByApp(rMap)
       }
     }).finally(() => setLoading(false))
   }, [key])
@@ -130,6 +138,7 @@ function AdminInner() {
         }
 
         setBurnTotal(data.formatted)
+        setRescoreTotal(data.rescores ?? 0)
         const pending = (data.results || []).filter((r: { scanComplete: boolean }) => !r.scanComplete)
         if (pending.length > 0) {
           const r = pending[0]
@@ -141,8 +150,13 @@ function AdminInner() {
 
         const stats = await fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.json())
         const map: Record<string, string> = {}
-        for (const row of stats.byApp || []) map[row.projectId] = row.formatted
+        const rMap: Record<string, number> = {}
+        for (const row of stats.byApp || []) {
+          map[row.projectId] = row.formatted
+          rMap[row.projectId] = row.rescores ?? 0
+        }
         setBurnByApp(map)
+        setRescoresByApp(rMap)
       } while (fullBackfill && !complete)
     } catch {
       setBurnError('Network error during sync')
@@ -196,7 +210,10 @@ function AdminInner() {
         <h1 className={styles.title}>admin panel</h1>
         {auth && (
           <div className={styles.burnBar}>
-            <span>🔥 {burnTotal ?? '…'} CLAWD burned (tracked apps)</span>
+            <span>
+              🔥 {burnTotal ?? '…'} CLAWD burned
+              {rescoreTotal != null && rescoreTotal > 0 && ` · ${rescoreTotal} rescores`}
+            </span>
             <div className={styles.burnActions}>
               <button className={styles.statusBtn} onClick={() => syncBurns(false)} disabled={syncingBurns}>
                 {syncingBurns ? '…' : 'sync'}
@@ -306,6 +323,9 @@ function AdminInner() {
                     </div>
                     {burnByApp[p.id] && (
                       <div className={styles.burnAppTotal}>🔥 {burnByApp[p.id]} CLAWD burned</div>
+                    )}
+                    {(rescoresByApp[p.id] ?? 0) > 0 && (
+                      <div className={styles.burnAppTotal}>📊 {rescoresByApp[p.id]} rescores (burn batches pending)</div>
                     )}
                   </div>
                 </div>

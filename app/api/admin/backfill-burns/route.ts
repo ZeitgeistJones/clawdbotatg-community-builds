@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncAllBurns, getBurnTotal, getBurnByApp, formatClawdAmount } from '@/lib/burnIndexer'
+import { syncAllBurns, getBurnTotal, getBurnByApp, getRescoreTotal, getRescoresByApp, formatClawdAmount } from '@/lib/burnIndexer'
 import { getApproved } from '@/lib/projects'
 import { resolveBurnConfig } from '@/lib/burnConfig'
 
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const results = await syncAllBurns({ fullBackfill: !!fullBackfill })
-    const total = await getBurnTotal()
+    const [total, rescores] = await Promise.all([getBurnTotal(), getRescoreTotal()])
     return NextResponse.json({
       ok: true,
       results: results.map(r => ({
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       })),
       total: total.wei.toString(),
       formatted: total.formatted,
+      rescores,
     })
   } catch (err) {
     console.error('backfill-burns failed:', err)
@@ -34,17 +35,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const [total, projects] = await Promise.all([getBurnTotal(), getApproved()])
+  const [total, rescores, projects] = await Promise.all([
+    getBurnTotal(),
+    getRescoreTotal(),
+    getApproved(),
+  ])
   const byApp = await Promise.all(
     projects.map(async p => {
       const config = resolveBurnConfig(p.url, p.burnConfig)
       if (!config) return null
-      const wei = await getBurnByApp(p.id)
+      const [wei, rescoreCount] = await Promise.all([
+        getBurnByApp(p.id),
+        getRescoresByApp(p.id),
+      ])
       return {
         projectId: p.id,
         name: p.name,
         wei: wei.toString(),
         formatted: formatClawdAmount(wei),
+        rescores: rescoreCount,
       }
     }),
   )
@@ -52,6 +61,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     total: total.wei.toString(),
     formatted: total.formatted,
+    rescores,
     byApp: byApp.filter(Boolean),
   })
 }
