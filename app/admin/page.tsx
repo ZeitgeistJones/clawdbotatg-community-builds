@@ -139,10 +139,11 @@ function AdminInner() {
       setRescoreTotal(data.rescores ?? 0)
 
       const r = data.results?.[0]
-      if (r?.rescorePagesRemaining) {
-        setBurnStatus('rescores: click backfill again for next page')
-      } else if (r && !r.scanComplete) {
-        setBurnStatus(`burn logs at block ${r.scannedTo} — click backfill again`)
+      const warn = r?.rescoreWarning
+      if (r && !r.scanComplete) {
+        setBurnStatus(`block ${r.scannedTo}${warn ? ` · rescores: ${warn}` : ''} — click backfill again`)
+      } else if (warn) {
+        setBurnStatus(`sync done · rescores: ${warn}`)
       } else {
         setBurnStatus('sync complete')
       }

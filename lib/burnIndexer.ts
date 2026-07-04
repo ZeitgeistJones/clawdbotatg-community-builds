@@ -13,7 +13,7 @@ const TRANSFER_EVENT = parseAbiItem(
   'event Transfer(address indexed from, address indexed to, uint256 value)',
 )
 
-/** Alchemy free tier: max 10 blocks per eth_getLogs */
+/** Public RPC limits eth_getLogs range — keep chunks small */
 const BLOCK_CHUNK = 10n
 /** Small batch — one click = ~6 log queries */
 const BACKFILL_MAX_BLOCKS = 30n
@@ -32,12 +32,6 @@ const rescoresByAppKey = (projectId: string) => `burns:rescores:by-app:${project
 const burnTxKey = (projectId: string) => `burns:burnTxs:${projectId}`
 const rescoreTxKey = (projectId: string) => `burns:rescoreTxs:${projectId}`
 
-/** Alchemy — asset transfers only */
-function getAlchemyUrl() {
-  return process.env.BASE_RPC_URL || ''
-}
-
-/** Public Base RPC — getLogs / getBlockNumber (avoid Alchemy log limits) */
 function getPublicRpcUrl() {
   return process.env.BASE_PUBLIC_RPC_URL || 'https://mainnet.base.org'
 }
@@ -48,25 +42,6 @@ function getPublicClient() {
 
 function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms))
-}
-
-async function rpcPost(url: string, body: object, retries = 5): Promise<unknown> {
-  if (!url) throw new Error('BASE_RPC_URL not set')
-  for (let i = 0; i < retries; i++) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const json = await res.json() as { error?: { message?: string; code?: number }; result?: unknown }
-    if (json.error?.code === 429 || res.status === 429) {
-      await sleep(Math.min(30000, 3000 * 2 ** i))
-      continue
-    }
-    if (json.error) throw new Error(json.error.message || 'RPC error')
-    return json.result
-  }
-  throw new Error('Rate limited — wait 2–3 minutes, then click backfill once')
 }
 
 export function formatClawdAmount(wei: bigint): string {
@@ -108,7 +83,7 @@ export interface SyncResult {
   scannedFrom: number
   scannedTo: number
   scanComplete: boolean
-  rescorePagesRemaining: boolean
+  rescoreWarning?: string
 }
 
 async function fetchLogsForFrom(
@@ -200,56 +175,138 @@ async function processClawdBurnLogs(
   return newBurns
 }
 
-interface AssetTransfer {
+interface ExplorerTx {
   hash: string
-  value: number | null
-  category: string
+  to: string
+  value: string
+  isError?: string
 }
 
-function isRescorePayment(t: AssetTransfer, paymentWei: bigint): boolean {
-  if (t.category !== 'external' || t.value == null) return false
-  const wei = BigInt(Math.round(t.value * 1e18))
-  return wei === paymentWei
+function getExplorerApiKey() {
+  return process.env.ETHERSCAN_API_KEY || process.env.BASESCAN_API_KEY || ''
 }
 
-async function syncRescorePage(
+/** Etherscan API v2 (Base chainid 8453) — replaces deprecated basescan.org v1 */
+async function fetchEtherscanTxPage(
+  receiver: string,
+  startBlock: bigint,
+  page: number,
+): Promise<ExplorerTx[]> {
+  const params = new URLSearchParams({
+    chainid: '8453',
+    module: 'account',
+    action: 'txlist',
+    address: receiver,
+    startblock: startBlock.toString(),
+    endblock: '99999999',
+    page: page.toString(),
+    offset: '1000',
+    sort: 'asc',
+  })
+  const apiKey = getExplorerApiKey()
+  if (apiKey) params.set('apikey', apiKey)
+
+  const res = await fetch(`https://api.etherscan.io/v2/api?${params}`)
+  const json = await res.json() as {
+    status: string
+    message: string
+    result: ExplorerTx[] | string
+  }
+
+  if (json.status !== '1') {
+    if (json.message === 'No transactions found') return []
+    const detail = typeof json.result === 'string' ? json.result : json.message
+    throw new Error(detail || 'Etherscan API error')
+  }
+  return Array.isArray(json.result) ? json.result : []
+}
+
+interface BlockscoutTx {
+  hash: string
+  to: { hash: string } | null
+  value: string
+  status: string
+  block_number: number
+}
+
+/** Blockscout — no API key, good fallback when Etherscan rate-limits */
+async function fetchBlockscoutTxs(
+  receiver: string,
+  startBlock: bigint,
+): Promise<ExplorerTx[]> {
+  const out: ExplorerTx[] = []
+  let url: string | null =
+    `https://base.blockscout.com/api/v2/addresses/${receiver}/transactions?filter=to`
+
+  while (url) {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Blockscout HTTP ${res.status}`)
+    const json = await res.json() as {
+      items?: BlockscoutTx[]
+      next_page_params?: { block_number: number; index: number; items_count: number }
+    }
+
+    for (const tx of json.items || []) {
+      if (tx.block_number < Number(startBlock)) continue
+      out.push({
+        hash: tx.hash,
+        to: tx.to?.hash || '',
+        value: tx.value,
+        isError: tx.status === 'ok' ? '0' : '1',
+      })
+    }
+
+    const next = json.next_page_params
+    if (!next) break
+    url = `https://base.blockscout.com/api/v2/addresses/${receiver}/transactions?filter=to&block_number=${next.block_number}&index=${next.index}&items_count=${next.items_count}`
+    await sleep(200)
+  }
+
+  return out
+}
+
+async function fetchAllIncomingTxs(
+  receiver: string,
+  startBlock: bigint,
+): Promise<ExplorerTx[]> {
+  try {
+    const all: ExplorerTx[] = []
+    for (let page = 1; page <= 10; page++) {
+      const batch = await fetchEtherscanTxPage(receiver, startBlock, page)
+      if (batch.length === 0) break
+      all.push(...batch)
+      if (batch.length < 1000) return all
+      await sleep(250)
+    }
+    return all
+  } catch (err) {
+    console.warn('Etherscan failed, trying Blockscout:', err)
+    return fetchBlockscoutTxs(receiver, startBlock)
+  }
+}
+
+async function syncRescoresFromExplorer(
   projectId: string,
   receiver: `0x${string}`,
   paymentWei: bigint,
   startBlock: bigint,
-  latestBlock: bigint,
 ): Promise<number> {
-  const alchemy = getAlchemyUrl()
-  if (!alchemy) return 0
+  const state = await kv.get<string>(rescorePageKey(projectId))
+  if (state === 'done') return 0
 
-  const savedPage = await kv.get<string>(rescorePageKey(projectId))
-  if (savedPage === 'done') return 0
-
-  const pageKey = savedPage && savedPage !== 'done' ? savedPage : undefined
-
-  const result = await rpcPost(alchemy, {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'alchemy_getAssetTransfers',
-    params: [{
-      fromBlock: `0x${startBlock.toString(16)}`,
-      toBlock: `0x${latestBlock.toString(16)}`,
-      toAddress: receiver,
-      category: ['external'],
-      withMetadata: false,
-      maxCount: '0x32',
-      ...(pageKey ? { pageKey } : {}),
-    }],
-  }) as { transfers?: AssetTransfer[]; pageKey?: string }
-
-  const transfers = result?.transfers || []
-  const rescores = transfers.filter(t => isRescorePayment(t, paymentWei))
-
+  const paymentStr = paymentWei.toString()
+  const receiverLower = receiver.toLowerCase()
   let newRescores = 0
-  for (const p of rescores) {
-    if (await kv.sismember(rescoreTxKey(projectId), p.hash)) continue
+
+  const txs = await fetchAllIncomingTxs(receiver, startBlock)
+
+  for (const tx of txs) {
+    if (tx.isError != null && tx.isError !== '0') continue
+    if (tx.to.toLowerCase() !== receiverLower) continue
+    if (tx.value !== paymentStr) continue
+    if (await kv.sismember(rescoreTxKey(projectId), tx.hash)) continue
     newRescores += 1
-    await kv.sadd(rescoreTxKey(projectId), p.hash)
+    await kv.sadd(rescoreTxKey(projectId), tx.hash)
   }
 
   if (newRescores > 0) {
@@ -259,17 +316,8 @@ async function syncRescorePage(
     await kv.set(RESCORES_TOTAL_KEY, hubTotal)
   }
 
-  if (result?.pageKey) {
-    await kv.set(rescorePageKey(projectId), result.pageKey)
-  } else {
-    await kv.set(rescorePageKey(projectId), 'done')
-  }
-
+  await kv.set(rescorePageKey(projectId), 'done')
   return newRescores
-}
-
-function rescorePagesRemaining(projectId: string) {
-  return kv.get<string>(rescorePageKey(projectId)).then(v => !!v && v !== 'done')
 }
 
 export async function syncProjectBurns(
@@ -285,29 +333,22 @@ export async function syncProjectBurns(
   const executeSelector = config.executeSelector || '0x61461954'
   const paymentWei = config.rescorePaymentWei || RESCORE_PAYMENT_WEI
 
-  const pagesLeft = await rescorePagesRemaining(project.id)
+  let newRescores = 0
+  let rescoreWarning: string | undefined
 
-  // Backfill: one Alchemy call per click until rescores are indexed
   if (options?.fullBackfill) {
     const pageState = await kv.get<string>(rescorePageKey(project.id))
     if (pageState !== 'done') {
-      const newRescores = await syncRescorePage(
-        project.id,
-        config.receiverAddress,
-        paymentWei,
-        startBlock,
-        latestBlock,
-      )
-      const stillLeft = await rescorePagesRemaining(project.id)
-      return {
-        projectId: project.id,
-        name: project.name,
-        newBurns: 0n,
-        newRescores,
-        scannedFrom: Number(startBlock),
-        scannedTo: Number(latestBlock),
-        scanComplete: !stillLeft,
-        rescorePagesRemaining: stillLeft,
+      try {
+        newRescores = await syncRescoresFromExplorer(
+          project.id,
+          config.receiverAddress,
+          paymentWei,
+          startBlock,
+        )
+      } catch (err) {
+        rescoreWarning = err instanceof Error ? err.message : 'Rescore sync failed'
+        console.error('rescore sync failed:', err)
       }
     }
   }
@@ -332,11 +373,11 @@ export async function syncProjectBurns(
       projectId: project.id,
       name: project.name,
       newBurns: 0n,
-      newRescores: 0,
+      newRescores,
       scannedFrom: Number(fromBlock),
       scannedTo: Number(latestBlock),
       scanComplete: true,
-      rescorePagesRemaining: false,
+      rescoreWarning,
     }
   }
 
@@ -377,11 +418,11 @@ export async function syncProjectBurns(
     projectId: project.id,
     name: project.name,
     newBurns,
-    newRescores: 0,
+    newRescores,
     scannedFrom: Number(fromBlock),
     scannedTo: Number(toBlock),
     scanComplete: burnScanComplete,
-    rescorePagesRemaining: false,
+    rescoreWarning,
   }
 }
 

@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       results: results.map(r => ({
         ...r,
         newBurns: r.newBurns.toString(),
-        rescorePagesRemaining: r.rescorePagesRemaining,
+        rescoreWarning: r.rescoreWarning,
       })),
       total: total.wei.toString(),
       formatted: total.formatted,
