@@ -142,7 +142,7 @@ function AdminInner() {
         const pending = (data.results || []).filter((r: { scanComplete: boolean }) => !r.scanComplete)
         if (pending.length > 0) {
           const r = pending[0]
-          setBurnStatus(`scanning block ${r.scannedTo}… click backfill again or wait`)
+          setBurnStatus(`scanning block ${r.scannedTo}…`)
         } else {
           setBurnStatus(null)
         }

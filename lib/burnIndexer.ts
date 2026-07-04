@@ -15,14 +15,16 @@ const TRANSFER_EVENT = parseAbiItem(
 
 /** Alchemy free tier limits eth_getLogs to 10 blocks per request */
 const BLOCK_CHUNK = 10n
-/** Blocks to scan per backfill invocation (avoids serverless timeout) */
-const BACKFILL_MAX_BLOCKS = 500n
+/** Blocks to scan per backfill batch for CLAWD burn logs */
+const BACKFILL_MAX_BLOCKS = 200n
+const RESCORE_PAYMENT_WEI = 8000000000000n
 
 export const BURNS_TOTAL_KEY = 'burns:total'
 export const RESCORES_TOTAL_KEY = 'burns:rescores:total'
 
 const lastBlockKey = (projectId: string) => `burns:lastBlock:${projectId}`
 const scanCursorKey = (projectId: string) => `burns:scanCursor:${projectId}`
+const rescorePageKey = (projectId: string) => `burns:rescorePage:${projectId}`
 const byAppKey = (projectId: string) => `burns:by-app:${projectId}`
 const rescoresByAppKey = (projectId: string) => `burns:rescores:by-app:${projectId}`
 const burnTxKey = (projectId: string) => `burns:burnTxs:${projectId}`
@@ -34,6 +36,29 @@ function getRpcUrl() {
 
 function getClient() {
   return createPublicClient({ chain: base, transport: http(getRpcUrl()) })
+}
+
+function sleep(ms: number) {
+  return new Promise(r => setTimeout(r, ms))
+}
+
+async function rpcPost(body: object, retries = 3): Promise<unknown> {
+  const rpc = getRpcUrl()
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(rpc, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json() as { error?: { message?: string; code?: number }; result?: unknown }
+    if (json.error?.code === 429 || res.status === 429) {
+      await sleep(1000 * (i + 1))
+      continue
+    }
+    if (json.error) throw new Error(json.error.message || 'RPC error')
+    return json.result
+  }
+  throw new Error('Rate limited — wait a minute and click backfill again')
 }
 
 export function formatClawdAmount(wei: bigint): string {
@@ -84,15 +109,25 @@ async function fetchLogsForFrom(
 
   while (start <= toBlock) {
     const end = start + BLOCK_CHUNK - 1n > toBlock ? toBlock : start + BLOCK_CHUNK - 1n
-    const chunk = await client.getLogs({
-      address: CLAWD_TOKEN,
-      event: TRANSFER_EVENT,
-      args: { from, to: DEAD_ADDRESS },
-      fromBlock: start,
-      toBlock: end,
-    })
-    logs.push(...chunk)
+    try {
+      const chunk = await client.getLogs({
+        address: CLAWD_TOKEN,
+        event: TRANSFER_EVENT,
+        args: { from, to: DEAD_ADDRESS },
+        fromBlock: start,
+        toBlock: end,
+      })
+      logs.push(...chunk)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('429') || msg.includes('Rate')) {
+        await sleep(1500)
+        continue
+      }
+      throw err
+    }
     start = end + 1n
+    await sleep(50)
   }
 
   return logs
@@ -152,82 +187,43 @@ interface AssetTransfer {
   category: string
 }
 
-async function fetchRescorePayments(
-  receiver: `0x${string}`,
-  paymentWei: bigint,
-  fromBlock: bigint,
-  toBlock: bigint,
-): Promise<AssetTransfer[]> {
-  const rpc = getRpcUrl()
-  const results: AssetTransfer[] = []
-  let pageKey: string | undefined
-
-  do {
-    const res = await fetch(rpc, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'alchemy_getAssetTransfers',
-        params: [{
-          fromBlock: `0x${fromBlock.toString(16)}`,
-          toBlock: `0x${toBlock.toString(16)}`,
-          toAddress: receiver,
-          category: ['external'],
-          withMetadata: false,
-          maxCount: '0x3e8',
-          ...(pageKey ? { pageKey } : {}),
-        }],
-      }),
-    })
-    const json = await res.json()
-    if (json.error) {
-      // Fallback: scan blocks if Alchemy transfers API unavailable
-      return scanBlocksForRescores(receiver, paymentWei, fromBlock, toBlock)
-    }
-    const transfers: AssetTransfer[] = json.result?.transfers || []
-    results.push(...transfers)
-    pageKey = json.result?.pageKey
-  } while (pageKey)
-
-  return results.filter(t =>
-    t.category === 'external' &&
-    t.value != null &&
-    BigInt(Math.round(t.value * 1e18)) === paymentWei,
-  )
+function isRescorePayment(t: AssetTransfer, paymentWei: bigint): boolean {
+  if (t.category !== 'external' || t.value == null) return false
+  const wei = BigInt(Math.round(t.value * 1e18))
+  return wei === paymentWei
 }
 
-async function scanBlocksForRescores(
+/** Paginated Alchemy transfers API — one page per sync call to avoid 429 */
+async function syncRescorePage(
+  projectId: string,
   receiver: `0x${string}`,
   paymentWei: bigint,
-  fromBlock: bigint,
-  toBlock: bigint,
-): Promise<AssetTransfer[]> {
-  const client = getClient()
-  const matches: AssetTransfer[] = []
+  startBlock: bigint,
+  latestBlock: bigint,
+): Promise<number> {
+  const savedPage = await kv.get<string>(rescorePageKey(projectId))
+  const pageKey = savedPage || undefined
 
-  for (let b = fromBlock; b <= toBlock; b++) {
-    const block = await client.getBlock({ blockNumber: b, includeTransactions: true })
-    for (const tx of block.transactions) {
-      if (typeof tx === 'string') continue
-      if (
-        tx.to?.toLowerCase() === receiver.toLowerCase() &&
-        tx.value === paymentWei &&
-        (tx.input === '0x' || tx.input === '0x0')
-      ) {
-        matches.push({ hash: tx.hash, value: Number(tx.value) / 1e18, category: 'external' })
-      }
-    }
-  }
+  const result = await rpcPost({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'alchemy_getAssetTransfers',
+    params: [{
+      fromBlock: `0x${startBlock.toString(16)}`,
+      toBlock: `0x${latestBlock.toString(16)}`,
+      toAddress: receiver,
+      category: ['external'],
+      withMetadata: false,
+      maxCount: '0x64',
+      ...(pageKey ? { pageKey } : {}),
+    }],
+  }) as { transfers?: AssetTransfer[]; pageKey?: string }
 
-  return matches
-}
+  const transfers = result?.transfers || []
+  const rescores = transfers.filter(t => isRescorePayment(t, paymentWei))
 
-async function processRescores(projectId: string, payments: AssetTransfer[]) {
   let newRescores = 0
-
-  for (const p of payments) {
+  for (const p of rescores) {
     if (await kv.sismember(rescoreTxKey(projectId), p.hash)) continue
     newRescores += 1
     await kv.sadd(rescoreTxKey(projectId), p.hash)
@@ -238,6 +234,12 @@ async function processRescores(projectId: string, payments: AssetTransfer[]) {
     const hubTotal = ((await kv.get<number>(RESCORES_TOTAL_KEY)) || 0) + newRescores
     await kv.set(rescoresByAppKey(projectId), appTotal)
     await kv.set(RESCORES_TOTAL_KEY, hubTotal)
+  }
+
+  if (result?.pageKey) {
+    await kv.set(rescorePageKey(projectId), result.pageKey)
+  } else {
+    await kv.del(rescorePageKey(projectId))
   }
 
   return newRescores
@@ -254,7 +256,7 @@ export async function syncProjectBurns(
   const latestBlock = await client.getBlockNumber()
   const startBlock = BigInt(config.startBlock ?? 0)
   const executeSelector = config.executeSelector || '0x61461954'
-  const paymentWei = config.rescorePaymentWei || 8000000000000n
+  const paymentWei = config.rescorePaymentWei || RESCORE_PAYMENT_WEI
 
   let fromBlock: bigint
   let toBlock: bigint
@@ -271,19 +273,27 @@ export async function syncProjectBurns(
     toBlock = latestBlock
   }
 
+  // Rescores: paginated transfers API (separate from block cursor)
+  const newRescores = await syncRescorePage(
+    project.id,
+    config.receiverAddress,
+    paymentWei,
+    startBlock,
+    latestBlock,
+  )
+
   if (fromBlock > latestBlock) {
     return {
       projectId: project.id,
       name: project.name,
       newBurns: 0n,
-      newRescores: 0,
+      newRescores,
       scannedFrom: Number(fromBlock),
       scannedTo: Number(latestBlock),
       scanComplete: true,
     }
   }
 
-  // CLAWD burned: pool→dead and receiver sweep→dead, only in execute() txs
   const fromAddresses = [
     config.poolAddress,
     config.receiverAddress,
@@ -303,19 +313,11 @@ export async function syncProjectBurns(
     executeSelector,
   )
 
-  // Rescore payments: ETH deposits to receiver (no burn in same tx)
-  const rescorePayments = await fetchRescorePayments(
-    config.receiverAddress,
-    paymentWei,
-    fromBlock,
-    toBlock,
-  )
-  const newRescores = await processRescores(project.id, rescorePayments)
-
-  const scanComplete = toBlock >= latestBlock
+  const burnScanComplete = toBlock >= latestBlock
+  const rescoreScanComplete = !(await kv.get(rescorePageKey(project.id)))
 
   if (options?.fullBackfill) {
-    if (scanComplete) {
+    if (burnScanComplete) {
       await kv.del(scanCursorKey(project.id))
       await kv.set(lastBlockKey(project.id), Number(latestBlock))
     } else {
@@ -332,7 +334,7 @@ export async function syncProjectBurns(
     newRescores,
     scannedFrom: Number(fromBlock),
     scannedTo: Number(toBlock),
-    scanComplete,
+    scanComplete: burnScanComplete && rescoreScanComplete,
   }
 }
 

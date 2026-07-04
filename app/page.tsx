@@ -77,12 +77,13 @@ export default async function Home() {
         />
         <h1 className={styles.title}>clawdbotatg community builds</h1>
         <p className={styles.subtitle}>stuff built by the community, for the community</p>
-        {burns.wei > BigInt(0) && (
-          <p className={styles.burnCounter}>🔥 {burns.formatted} CLAWD burned by community apps</p>
-        )}
-        {burns.wei === BigInt(0) && rescores > 0 && (
-          <p className={styles.burnCounter}>📊 {rescores} paid rescores — CLAWD burns when batch executes</p>
-        )}
+        <p className={styles.burnCounter}>
+          {burns.wei > BigInt(0)
+            ? `🔥 ${burns.formatted} CLAWD burned by community apps`
+            : rescores > 0
+              ? `📊 ${rescores} paid rescores — CLAWD burns when batch executes`
+              : `🔥 ${burns.formatted} CLAWD burned · 📊 ${rescores} rescores`}
+        </p>
       </header>
 
       <div className={styles.grid}>
