@@ -1,6 +1,7 @@
 'use client'
 
 import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useEffect } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import styles from './burnHub.module.css'
 
@@ -17,12 +18,17 @@ const EXECUTE_ABI = [
 interface Props {
   receiver: `0x${string}`
   disabled?: boolean
+  onSuccess?: () => void
 }
 
-export default function TriggerExecuteBurnButton({ receiver, disabled }: Props) {
+export default function TriggerExecuteBurnButton({ receiver, disabled, onSuccess }: Props) {
   const { isConnected } = useAccount()
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract()
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+
+  useEffect(() => {
+    if (isSuccess) onSuccess?.()
+  }, [isSuccess, onSuccess])
 
   if (!isConnected) {
     return (

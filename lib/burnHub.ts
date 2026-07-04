@@ -1,67 +1,59 @@
 import { createPublicClient, formatUnits, http } from 'viem'
 import { base } from 'viem/chains'
 import { BURN_APPS } from '@/lib/burnApps'
+import { fetchOnChainBurnTotals } from '@/lib/clawdBurnIndex'
 import { normalizeProjectUrl } from '@/lib/burnConfig'
+import { getRescoresByApp } from '@/lib/burnIndexer'
 import { getApproved } from '@/lib/projects'
-import {
-  formatClawdAmount,
-  getBurnByApp,
-  getBurnLastUpdated,
-  getBurnTotal,
-  getRescoresByApp,
-} from '@/lib/burnIndexer'
 
 function getPublicClient() {
   const url = process.env.BASE_PUBLIC_RPC_URL || 'https://mainnet.base.org'
   return createPublicClient({ chain: base, transport: http(url) })
 }
 
-export interface BurnAppSnapshot {
+export interface PendingBurnApp {
   id: string
-  name: string
-  appUrl: string
-  basescanWriteUrl: string
   receiverAddress: `0x${string}`
-  burnsFormatted: string
-  rescores: number
   ethPending: string
-  hasPendingEth: boolean
+  appUrl?: string
 }
 
 export async function getBurnHubSnapshot() {
-  const [approved, totalBurns, lastUpdated, client] = await Promise.all([
+  const [approved, onChain, client] = await Promise.all([
     getApproved(),
-    getBurnTotal(),
-    getBurnLastUpdated(),
+    fetchOnChainBurnTotals(),
     Promise.resolve(getPublicClient()),
   ])
 
-  const apps: BurnAppSnapshot[] = await Promise.all(
-    BURN_APPS.map(async entry => {
-      const project = approved.find(p => normalizeProjectUrl(p.url) === entry.host)
-      const projectId = project?.id
+  const pending: PendingBurnApp[] = []
 
-      const [burnsWei, rescores, ethWei] = await Promise.all([
-        projectId ? getBurnByApp(projectId) : Promise.resolve(0n),
-        projectId ? getRescoresByApp(projectId) : Promise.resolve(0),
-        client.getBalance({ address: entry.receiverAddress }),
-      ])
+  for (const entry of BURN_APPS) {
+    if (!entry.receiverAddress) continue
 
-      const ethPending = formatUnits(ethWei, 18)
+    const ethWei = await client.getBalance({ address: entry.receiverAddress })
+    if (ethWei === 0n) continue
 
-      return {
-        id: entry.id,
-        name: entry.name,
-        appUrl: entry.appUrl,
-        basescanWriteUrl: entry.basescanWriteUrl,
-        receiverAddress: entry.receiverAddress,
-        burnsFormatted: formatClawdAmount(burnsWei),
-        rescores,
-        ethPending,
-        hasPendingEth: ethWei > 0n,
-      }
-    }),
-  )
+    pending.push({
+      id: entry.id,
+      receiverAddress: entry.receiverAddress,
+      ethPending: formatUnits(ethWei, 18),
+      appUrl: entry.appUrl,
+    })
+  }
 
-  return { totalBurns, lastUpdated, apps }
+  const rescoresByApp: Record<string, number> = {}
+  for (const entry of BURN_APPS) {
+    if (!entry.host) continue
+    const project = approved.find(p => normalizeProjectUrl(p.url) === entry.host)
+    if (project) {
+      rescoresByApp[entry.id] = await getRescoresByApp(project.id)
+    }
+  }
+
+  return {
+    totalFormatted: onChain.totalFormatted,
+    lastBurnAt: onChain.lastBurnAt,
+    pending,
+    rescoresByApp,
+  }
 }

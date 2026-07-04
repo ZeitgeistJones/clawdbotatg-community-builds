@@ -1,44 +1,32 @@
-.panel {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: left;
+.burnHub {
+  margin-top: 0.5rem;
+  text-align: center;
 }
 
-.appRow {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.appMeta {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.appName {
+.burnCounter {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text);
+  color: #AA2222;
 }
 
-.appStats {
+.burnUpdated {
   font-size: 11px;
   color: var(--text-muted);
-  line-height: 1.4;
+  margin-top: 2px;
 }
 
-.appActions {
+.pendingRow {
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+}
+
+.pendingLabel {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .connectWrap {

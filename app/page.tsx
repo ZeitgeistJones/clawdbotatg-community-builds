@@ -1,7 +1,7 @@
 import { getApproved } from '@/lib/projects'
 import type { FeatureTag } from '@/lib/projects'
 import { getBurnHubSnapshot } from '@/lib/burnHub'
-import BurnHubPanel from './components/BurnHubPanel'
+import BurnStats from './components/BurnStats'
 import styles from './page.module.css'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -57,23 +57,13 @@ interface ComingSoonItem {
 
 export const revalidate = 0
 
-function formatLastUpdated(ts: number): string {
-  return new Date(ts).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
 export default async function Home() {
   const [projects, comingSoon, burnHub] = await Promise.all([
     getApproved(),
     kv.get<ComingSoonItem[]>('coming-soon').then(r => r || []),
     getBurnHubSnapshot(),
   ])
-  const { totalBurns: burns, lastUpdated, apps: burnApps } = burnHub
+  const { totalFormatted, lastBurnAt, pending } = burnHub
 
   return (
     <main className={styles.wrap}>
@@ -88,15 +78,11 @@ export default async function Home() {
         />
         <h1 className={styles.title}>clawdbotatg community builds</h1>
         <p className={styles.subtitle}>stuff built by the community, for the community</p>
-        <div className={styles.burnStats}>
-          <p className={styles.burnCounter}>
-            🔥 {burns.formatted} CLAWD community builds burns
-          </p>
-          {lastUpdated && (
-            <p className={styles.burnUpdated}>updated {formatLastUpdated(lastUpdated)}</p>
-          )}
-        </div>
-        <BurnHubPanel apps={burnApps} />
+        <BurnStats
+          totalFormatted={totalFormatted}
+          lastBurnAt={lastBurnAt}
+          pending={pending}
+        />
       </header>
 
       <div className={styles.grid}>
