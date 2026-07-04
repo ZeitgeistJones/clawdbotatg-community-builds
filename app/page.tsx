@@ -1,6 +1,7 @@
 import { getApproved } from '@/lib/projects'
 import type { FeatureTag } from '@/lib/projects'
-import { getBurnTotal, getBurnLastUpdated } from '@/lib/burnIndexer'
+import { getBurnHubSnapshot } from '@/lib/burnHub'
+import BurnHubPanel from './components/BurnHubPanel'
 import styles from './page.module.css'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -67,12 +68,12 @@ function formatLastUpdated(ts: number): string {
 }
 
 export default async function Home() {
-  const [projects, comingSoon, burns, lastUpdated] = await Promise.all([
+  const [projects, comingSoon, burnHub] = await Promise.all([
     getApproved(),
     kv.get<ComingSoonItem[]>('coming-soon').then(r => r || []),
-    getBurnTotal(),
-    getBurnLastUpdated(),
+    getBurnHubSnapshot(),
   ])
+  const { totalBurns: burns, lastUpdated, apps: burnApps } = burnHub
 
   return (
     <main className={styles.wrap}>
@@ -95,6 +96,7 @@ export default async function Home() {
             <p className={styles.burnUpdated}>updated {formatLastUpdated(lastUpdated)}</p>
           )}
         </div>
+        <BurnHubPanel apps={burnApps} />
       </header>
 
       <div className={styles.grid}>
