@@ -14,33 +14,29 @@ interface ComingSoonItem {
 
 export default function ComingSoonCard({ item }: { item: ComingSoonItem }) {
   const [iframeError, setIframeError] = useState(false)
+  const showPreview = item.url && !iframeError
 
   return (
-    <div className={styles.card}>
-      <div className={styles.preview}>
-        {item.url && !iframeError ? (
-          <div className={styles.iframeWrap}>
-            <iframe
-              src={item.url}
-              className={styles.iframe}
-              onError={() => setIframeError(true)}
-              sandbox="allow-scripts allow-same-origin"
-              title={item.name}
-            />
-            <div className={styles.iframeOverlay} />
-          </div>
-        ) : (
-          <div className={styles.fallbackBg} />
-        )}
+    <div className={`${styles.wrap}${showPreview ? ` ${styles.wrapWithPreview}` : ''}`}>
+      <div className={styles.card}>
         <div className={styles.badge}>coming soon</div>
-      </div>
-
-      <div className={styles.textPanel}>
         <span className={styles.emoji}>{item.emoji}</span>
         <div className={styles.name}>{item.name}</div>
         <div className={styles.desc}>{item.desc}</div>
         {item.teaser && <div className={styles.teaser}>{item.teaser}</div>}
       </div>
+
+      {showPreview && (
+        <div className={styles.preview}>
+          <iframe
+            src={item.url}
+            className={styles.iframe}
+            onError={() => setIframeError(true)}
+            sandbox="allow-scripts allow-same-origin"
+            title={`${item.name} preview`}
+          />
+        </div>
+      )}
     </div>
   )
 }
