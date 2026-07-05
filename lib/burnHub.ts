@@ -50,6 +50,25 @@ export async function getBurnHubSnapshot() {
     }
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7667/ingest/bd4f377e-4d41-4100-9d6d-2ca3179736d1', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c673ac' },
+    body: JSON.stringify({
+      sessionId: 'c673ac',
+      hypothesisId: 'D',
+      location: 'burnHub.ts:snapshot',
+      message: 'getBurnHubSnapshot result',
+      data: {
+        totalFormatted: onChain.totalFormatted,
+        totalWei: onChain.totalWei.toString(),
+        lastBurnAt: onChain.lastBurnAt,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+
   return {
     totalFormatted: onChain.totalFormatted,
     lastBurnAt: onChain.lastBurnAt,
