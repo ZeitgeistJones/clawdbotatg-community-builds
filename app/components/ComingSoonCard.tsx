@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import styles from './ComingSoonCard.module.css'
 
 interface ComingSoonItem {
@@ -12,12 +11,19 @@ interface ComingSoonItem {
   url?: string
 }
 
+function previewHost(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
 export default function ComingSoonCard({ item }: { item: ComingSoonItem }) {
-  const [iframeError, setIframeError] = useState(false)
-  const showPreview = item.url && !iframeError
+  const hasUrl = Boolean(item.url)
 
   return (
-    <div className={`${styles.wrap}${showPreview ? ` ${styles.wrapWithPreview}` : ''}`}>
+    <div className={`${styles.wrap}${hasUrl ? ` ${styles.wrapWithPreview}` : ''}`}>
       <div className={styles.card}>
         <div className={styles.badge}>coming soon</div>
         <span className={styles.emoji}>{item.emoji}</span>
@@ -26,16 +32,16 @@ export default function ComingSoonCard({ item }: { item: ComingSoonItem }) {
         {item.teaser && <div className={styles.teaser}>{item.teaser}</div>}
       </div>
 
-      {showPreview && (
-        <div className={styles.preview}>
-          <iframe
-            src={item.url}
-            className={styles.iframe}
-            onError={() => setIframeError(true)}
-            sandbox="allow-scripts allow-same-origin"
-            title={`${item.name} preview`}
-          />
-        </div>
+      {hasUrl && (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.previewLink}
+        >
+          {previewHost(item.url!)}
+          <span className={styles.previewArrow}>↗</span>
+        </a>
       )}
     </div>
   )

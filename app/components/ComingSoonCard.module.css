@@ -9,7 +9,6 @@
   min-height: auto;
 }
 
-/* matches hub .card layout */
 .card {
   position: relative;
   background: var(--card-bg);
@@ -56,32 +55,48 @@
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.45;
-  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .teaser {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
   line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.preview {
-  height: 72px;
-  overflow: hidden;
+.previewLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
   border: 1px dashed var(--border-hover);
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
-  background: var(--bg-secondary);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
 }
 
-.iframe {
-  width: 200%;
-  height: 200%;
-  transform: scale(0.5);
-  transform-origin: top left;
-  border: none;
-  pointer-events: none;
-  filter: blur(4px) saturate(0.85);
-  opacity: 0.9;
+.previewLink:hover {
+  color: var(--text);
+  background: var(--card-hover);
+}
+
+.previewArrow {
+  flex-shrink: 0;
+  font-size: 12px;
+  opacity: 0.6;
 }
