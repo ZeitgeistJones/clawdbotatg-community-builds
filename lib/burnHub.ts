@@ -1,14 +1,36 @@
 import { createPublicClient, formatUnits, http } from 'viem'
 import { base } from 'viem/chains'
 import { BURN_APPS } from '@/lib/burnApps'
-import { fetchOnChainBurnTotals } from '@/lib/clawdBurnIndex'
 import { normalizeProjectUrl } from '@/lib/burnConfig'
-import { getRescoresByApp } from '@/lib/burnIndexer'
-import { getApproved } from '@/lib/projects'
+import { getBurnTotal, getBurnLastUpdated, getRescoresByApp } from '@/lib/burnIndexer'
+import { getApproved, type Project } from '@/lib/projects'
 
 function getPublicClient() {
   const url = process.env.BASE_PUBLIC_RPC_URL || 'https://mainnet.base.org'
   return createPublicClient({ chain: base, transport: http(url) })
+}
+
+function debugLog(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
+  // #region agent log
+  fetch('http://127.0.0.1:7685/ingest/806f9d64-9ddf-4ee5-9b60-ca0a71789be3', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '391049' },
+    body: JSON.stringify({
+      sessionId: '391049',
+      runId: 'post-fix',
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
 }
 
 export interface PendingBurnApp {
@@ -18,60 +40,62 @@ export interface PendingBurnApp {
   appUrl?: string
 }
 
-export async function getBurnHubSnapshot() {
-  const [approved, onChain, client] = await Promise.all([
-    getApproved(),
-    fetchOnChainBurnTotals(),
+export async function getBurnHubSnapshot(approved?: Project[]) {
+  const started = Date.now()
+
+  const [projectList, burnTotal, lastBurnAt, client] = await Promise.all([
+    approved ?? getApproved(),
+    getBurnTotal(),
+    getBurnLastUpdated(),
     Promise.resolve(getPublicClient()),
   ])
 
-  const pending: PendingBurnApp[] = []
+  const afterKvMs = Date.now() - started
+  debugLog('H1', 'burnHub.ts:afterKv', 'cached burn totals loaded', {
+    afterKvMs,
+    totalFormatted: burnTotal.formatted,
+    lastBurnAt,
+  })
 
-  for (const entry of BURN_APPS) {
-    if (!entry.receiverAddress) continue
-
-    const ethWei = await client.getBalance({ address: entry.receiverAddress })
-    if (ethWei === 0n) continue
-
-    pending.push({
-      id: entry.id,
-      receiverAddress: entry.receiverAddress,
-      ethPending: formatUnits(ethWei, 18),
-      appUrl: entry.appUrl,
-    })
-  }
-
-  const rescoresByApp: Record<string, number> = {}
-  for (const entry of BURN_APPS) {
-    if (!entry.host) continue
-    const project = approved.find(p => normalizeProjectUrl(p.url) === entry.host)
-    if (project) {
-      rescoresByApp[entry.id] = await getRescoresByApp(project.id)
-    }
-  }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7667/ingest/bd4f377e-4d41-4100-9d6d-2ca3179736d1', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c673ac' },
-    body: JSON.stringify({
-      sessionId: 'c673ac',
-      hypothesisId: 'D',
-      location: 'burnHub.ts:snapshot',
-      message: 'getBurnHubSnapshot result',
-      data: {
-        totalFormatted: onChain.totalFormatted,
-        totalWei: onChain.totalWei.toString(),
-        lastBurnAt: onChain.lastBurnAt,
-      },
-      timestamp: Date.now(),
+  const pendingEntries = BURN_APPS.filter(e => e.receiverAddress)
+  const pendingResults = await Promise.all(
+    pendingEntries.map(async entry => {
+      const ethWei = await client.getBalance({ address: entry.receiverAddress! })
+      if (ethWei === 0n) return null
+      return {
+        id: entry.id,
+        receiverAddress: entry.receiverAddress!,
+        ethPending: formatUnits(ethWei, 18),
+        appUrl: entry.appUrl,
+      } satisfies PendingBurnApp
     }),
-  }).catch(() => {})
-  // #endregion
+  )
+  const pending = pendingResults.filter(Boolean) as PendingBurnApp[]
+
+  const rescoreEntries = BURN_APPS.filter(e => e.host)
+  const rescorePairs = await Promise.all(
+    rescoreEntries.map(async entry => {
+      const project = projectList.find(p => normalizeProjectUrl(p.url) === entry.host)
+      if (!project) return null
+      const count = await getRescoresByApp(project.id)
+      return [entry.id, count] as const
+    }),
+  )
+  const rescoresByApp = Object.fromEntries(
+    rescorePairs.filter(Boolean) as [string, number][],
+  )
+
+  const totalMs = Date.now() - started
+  debugLog('H1', 'burnHub.ts:snapshot', 'getBurnHubSnapshot complete', {
+    totalMs,
+    afterKvMs,
+    pendingCount: pending.length,
+    source: 'kv-cache',
+  })
 
   return {
-    totalFormatted: onChain.totalFormatted,
-    lastBurnAt: onChain.lastBurnAt,
+    totalFormatted: burnTotal.formatted,
+    lastBurnAt,
     pending,
     rescoresByApp,
   }
