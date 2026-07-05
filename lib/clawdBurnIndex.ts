@@ -49,23 +49,6 @@ export function getBurnFetchDebug() {
   return lastDebug
 }
 
-function debugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-  // #region agent log
-  fetch('http://127.0.0.1:7667/ingest/bd4f377e-4d41-4100-9d6d-2ca3179736d1', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c673ac' },
-    body: JSON.stringify({
-      sessionId: 'c673ac',
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
-}
-
 function getAttributionSet() {
   const set = new Set<string>()
   for (const app of BURN_APPS) {
@@ -135,10 +118,6 @@ async function fetchBurnsViaReceiverTxs(): Promise<OnChainBurnTotals> {
   const uniqueTxs = new Set<string>()
   let stoppedReason = 'complete'
 
-  debugLog('C', 'clawdBurnIndex.ts:receiverStart', 'fetchBurnsViaReceiverTxs start', {
-    apps: BURN_APPS.map(a => a.attributionAddress),
-  })
-
   for (const app of BURN_APPS) {
     let url: string | null = `${BLOCKSCOUT}/addresses/${app.attributionAddress}/transactions`
 
@@ -147,11 +126,6 @@ async function fetchBurnsViaReceiverTxs(): Promise<OnChainBurnTotals> {
       if (!res.ok) {
         pagesFailed++
         stoppedReason = `receiver_page_http_${res.status}_${app.id}_p${page}`
-        debugLog('C', 'clawdBurnIndex.ts:receiverPageFail', 'receiver tx page failed', {
-          app: app.id,
-          page,
-          status: res.status,
-        })
         break
       }
 
@@ -208,12 +182,6 @@ async function fetchBurnsViaReceiverTxs(): Promise<OnChainBurnTotals> {
     durationMs: Date.now() - started,
   }
 
-  debugLog('C', 'clawdBurnIndex.ts:receiverExit', 'fetchBurnsViaReceiverTxs done', {
-    ...lastReceiverDebug,
-    totalWei: totalWei.toString(),
-    totalFormatted: formatClawdAmount(totalWei),
-  })
-
   const byApp: OnChainBurnTotals['byApp'] = {}
   for (const app of BURN_APPS) {
     const wei = byAppWei[app.id] || 0n
@@ -247,19 +215,11 @@ export async function fetchOnChainBurnTotalsLegacy(): Promise<OnChainBurnTotals>
   const uniqueMatchedTxs = new Set<string>()
   let stoppedReason = 'complete'
 
-  debugLog('A', 'clawdBurnIndex.ts:entry', 'fetchOnChainBurnTotals start', {
-    attribution: [...attribution],
-  })
-
   for (let page = 0; page < 30 && url; page++) {
     const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) {
       pagesFailed++
       stoppedReason = `page_http_${res.status}_at_${page}`
-      debugLog('A', 'clawdBurnIndex.ts:pageFail', 'transfer page failed', {
-        page,
-        status: res.status,
-      })
       break
     }
     const json = await res.json() as {
@@ -310,12 +270,6 @@ export async function fetchOnChainBurnTotalsLegacy(): Promise<OnChainBurnTotals>
     stoppedReason,
     durationMs: Date.now() - started,
   }
-
-  debugLog('B', 'clawdBurnIndex.ts:exit', 'fetchOnChainBurnTotals done', {
-    ...lastDebug,
-    totalWei: totalWei.toString(),
-    totalFormatted: formatClawdAmount(totalWei),
-  })
 
   const byApp: OnChainBurnTotals['byApp'] = {}
   for (const app of BURN_APPS) {

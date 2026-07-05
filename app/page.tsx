@@ -58,33 +58,12 @@ interface ComingSoonItem {
 export const revalidate = 0
 
 export default async function Home() {
-  const pageStarted = Date.now()
   const approvedPromise = getApproved()
   const [projects, comingSoon, burnHub] = await Promise.all([
     approvedPromise,
     kv.get<ComingSoonItem[]>('coming-soon').then(r => r || []),
     approvedPromise.then(p => getBurnHubSnapshot(p)),
   ])
-
-  // #region agent log
-  fetch('http://127.0.0.1:7685/ingest/806f9d64-9ddf-4ee5-9b60-ca0a71789be3', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '391049' },
-    body: JSON.stringify({
-      sessionId: '391049',
-      runId: 'post-fix',
-      hypothesisId: 'H5',
-      location: 'page.tsx:Home',
-      message: 'home page data loaded',
-      data: {
-        totalMs: Date.now() - pageStarted,
-        projectCount: projects.length,
-        comingSoonCount: comingSoon.length,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
   const { totalFormatted, lastBurnAt, pending } = burnHub
 
   return (
