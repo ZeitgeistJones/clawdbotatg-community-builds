@@ -177,11 +177,20 @@ export async function updateProjectMeta(id: string, meta: Partial<ProjectMeta>):
   await kv.set(`project:${id}`, { ...project, ...meta })
 }
 
+export async function updateProjectDesc(id: string, desc: string): Promise<void> {
+  if (id.startsWith('seed-')) {
+    throw new Error('Seed project descriptions are edited in lib/projects.ts')
+  }
+  const project = await kv.get<Project>(`project:${id}`)
+  if (!project) throw new Error('Project not found')
+  await kv.set(`project:${id}`, { ...project, desc })
+}
+
 const SEED_PROJECTS: Project[] = [
   {
     id: 'seed-1',
     name: 'Talk Normie 2 Me',
-    desc: 'Explains any GitHub repo in plain English, with personality modes',
+    desc: 'Explains any GitHub repo in plain English, with personality modes for every type of reader.',
     emoji: '🗣️',
     url: 'https://talk-normie-2-me.vercel.app',
     tag: 'tool',
@@ -199,7 +208,7 @@ const SEED_PROJECTS: Project[] = [
   {
     id: 'seed-2',
     name: "I've Seen Things",
-    desc: 'Your wallet tells its story. Dramatic first-person coin narratives',
+    desc: 'Your wallet tells its story through dramatic first-person coin narratives from on-chain history.',
     emoji: '👁️',
     url: 'https://iveseenthings.vercel.app',
     tag: 'tool',
@@ -216,7 +225,7 @@ const SEED_PROJECTS: Project[] = [
   {
     id: 'seed-3',
     name: 'Larvae Performance Review',
-    desc: 'Public accountability dashboard scoring CLAWD build delivery',
+    desc: 'Public accountability dashboard that scores CLAWD build delivery across repos and timelines.',
     emoji: '📊',
     url: 'https://larvaereview.vercel.app',
     tag: 'data',
@@ -233,7 +242,7 @@ const SEED_PROJECTS: Project[] = [
   {
     id: 'seed-4',
     name: 'Tripwire',
-    desc: 'Token-gated dashboard for CLAWD holders',
+    desc: 'Token-gated dashboard for CLAWD holders—monitor signals, access controls, and holder-only tools.',
     emoji: '🔐',
     url: 'https://tripwire-app.vercel.app/',
     tag: 'tool',
