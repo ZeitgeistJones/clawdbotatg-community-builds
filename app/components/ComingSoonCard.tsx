@@ -26,8 +26,8 @@ export default function ComingSoonCard({ item }: { item: ComingSoonItem }) {
       <span className={styles.emoji}>{item.emoji}</span>
       <div className={styles.name}>{item.name}</div>
       <div className={styles.desc}>{item.desc}</div>
-      {item.teaser && <div className={styles.teaser}>{item.teaser}</div>}
-      {item.url && (
+      <span className={styles.tag}>soon</span>
+      {item.url ? (
         <a
           href={item.url}
           target="_blank"
@@ -37,6 +37,8 @@ export default function ComingSoonCard({ item }: { item: ComingSoonItem }) {
           {previewHost(item.url)}
           <span className={styles.footerArrow}>↗</span>
         </a>
+      ) : (
+        <div className={styles.footerSpacer} />
       )}
     </div>
   )
