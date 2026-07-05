@@ -17,25 +17,25 @@ export default function ComingSoonCard({ item }: { item: ComingSoonItem }) {
 
   return (
     <div className={styles.card}>
-      {/* blurred iframe background */}
-      {item.url && !iframeError ? (
-        <div className={styles.iframeWrap}>
-          <iframe
-            src={item.url}
-            className={styles.iframe}
-            onError={() => setIframeError(true)}
-            sandbox="allow-scripts allow-same-origin"
-            title={item.name}
-          />
-          <div className={styles.iframeOverlay} />
-        </div>
-      ) : (
-        <div className={styles.fallbackBg} />
-      )}
-
-      {/* card content on top */}
-      <div className={styles.content}>
+      <div className={styles.preview}>
+        {item.url && !iframeError ? (
+          <div className={styles.iframeWrap}>
+            <iframe
+              src={item.url}
+              className={styles.iframe}
+              onError={() => setIframeError(true)}
+              sandbox="allow-scripts allow-same-origin"
+              title={item.name}
+            />
+            <div className={styles.iframeOverlay} />
+          </div>
+        ) : (
+          <div className={styles.fallbackBg} />
+        )}
         <div className={styles.badge}>coming soon</div>
+      </div>
+
+      <div className={styles.textPanel}>
         <span className={styles.emoji}>{item.emoji}</span>
         <div className={styles.name}>{item.name}</div>
         <div className={styles.desc}>{item.desc}</div>
