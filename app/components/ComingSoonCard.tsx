@@ -20,27 +20,22 @@ function previewHost(url: string) {
 }
 
 export default function ComingSoonCard({ item }: { item: ComingSoonItem }) {
-  const hasUrl = Boolean(item.url)
-
   return (
-    <div className={`${styles.wrap}${hasUrl ? ` ${styles.wrapWithPreview}` : ''}`}>
-      <div className={styles.card}>
-        <div className={styles.badge}>coming soon</div>
-        <span className={styles.emoji}>{item.emoji}</span>
-        <div className={styles.name}>{item.name}</div>
-        <div className={styles.desc}>{item.desc}</div>
-        {item.teaser && <div className={styles.teaser}>{item.teaser}</div>}
-      </div>
-
-      {hasUrl && (
+    <div className={styles.card}>
+      <div className={styles.badge}>coming soon</div>
+      <span className={styles.emoji}>{item.emoji}</span>
+      <div className={styles.name}>{item.name}</div>
+      <div className={styles.desc}>{item.desc}</div>
+      {item.teaser && <div className={styles.teaser}>{item.teaser}</div>}
+      {item.url && (
         <a
           href={item.url}
           target="_blank"
           rel="noopener noreferrer"
-          className={styles.previewLink}
+          className={styles.footer}
         >
-          {previewHost(item.url!)}
-          <span className={styles.previewArrow}>↗</span>
+          {previewHost(item.url)}
+          <span className={styles.footerArrow}>↗</span>
         </a>
       )}
     </div>
