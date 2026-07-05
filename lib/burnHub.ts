@@ -2,7 +2,8 @@ import { createPublicClient, formatUnits, http } from 'viem'
 import { base } from 'viem/chains'
 import { BURN_APPS } from '@/lib/burnApps'
 import { normalizeProjectUrl } from '@/lib/burnConfig'
-import { getBurnTotal, getBurnLastUpdated, getRescoresByApp } from '@/lib/burnIndexer'
+import { getRescoresByApp } from '@/lib/burnIndexer'
+import { getHubBurnForDisplay } from '@/lib/burnSnapshot'
 import { getApproved, type Project } from '@/lib/projects'
 
 function getPublicClient() {
@@ -22,7 +23,7 @@ function debugLog(
     headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '391049' },
     body: JSON.stringify({
       sessionId: '391049',
-      runId: 'post-fix',
+      runId: 'post-fix-v2',
       hypothesisId,
       location,
       message,
@@ -43,18 +44,17 @@ export interface PendingBurnApp {
 export async function getBurnHubSnapshot(approved?: Project[]) {
   const started = Date.now()
 
-  const [projectList, burnTotal, lastBurnAt, client] = await Promise.all([
+  const [projectList, hubBurn, client] = await Promise.all([
     approved ?? getApproved(),
-    getBurnTotal(),
-    getBurnLastUpdated(),
+    getHubBurnForDisplay(),
     Promise.resolve(getPublicClient()),
   ])
 
-  const afterKvMs = Date.now() - started
-  debugLog('H1', 'burnHub.ts:afterKv', 'cached burn totals loaded', {
-    afterKvMs,
-    totalFormatted: burnTotal.formatted,
-    lastBurnAt,
+  debugLog('H6', 'burnHub.ts:hubBurn', 'hub burn totals resolved', {
+    source: hubBurn.source,
+    totalFormatted: hubBurn.totalFormatted,
+    lastBurnAt: hubBurn.lastBurnAt,
+    ms: Date.now() - started,
   })
 
   const pendingEntries = BURN_APPS.filter(e => e.receiverAddress)
@@ -85,17 +85,15 @@ export async function getBurnHubSnapshot(approved?: Project[]) {
     rescorePairs.filter(Boolean) as [string, number][],
   )
 
-  const totalMs = Date.now() - started
-  debugLog('H1', 'burnHub.ts:snapshot', 'getBurnHubSnapshot complete', {
-    totalMs,
-    afterKvMs,
-    pendingCount: pending.length,
-    source: 'kv-cache',
+  debugLog('H6', 'burnHub.ts:snapshot', 'getBurnHubSnapshot complete', {
+    totalMs: Date.now() - started,
+    source: hubBurn.source,
+    totalFormatted: hubBurn.totalFormatted,
   })
 
   return {
-    totalFormatted: burnTotal.formatted,
-    lastBurnAt,
+    totalFormatted: hubBurn.totalFormatted,
+    lastBurnAt: hubBurn.lastBurnAt,
     pending,
     rescoresByApp,
   }

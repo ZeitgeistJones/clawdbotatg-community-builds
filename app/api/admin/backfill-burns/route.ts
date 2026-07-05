@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAllBurns, getBurnTotal, getBurnByApp, getRescoreTotal, getRescoresByApp, formatClawdAmount } from '@/lib/burnIndexer'
+import { syncHubBurnCache, getHubBurnCache } from '@/lib/burnSnapshot'
 import { getApproved } from '@/lib/projects'
 import { resolveBurnConfig } from '@/lib/burnConfig'
 
@@ -10,7 +11,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const results = await syncAllBurns({ fullBackfill: !!fullBackfill })
+    const [results, hubBurn] = await Promise.all([
+      syncAllBurns({ fullBackfill: !!fullBackfill }),
+      syncHubBurnCache(),
+    ])
     const [total, rescores] = await Promise.all([getBurnTotal(), getRescoreTotal()])
     return NextResponse.json({
       ok: true,
@@ -21,6 +25,11 @@ export async function POST(req: NextRequest) {
       })),
       total: total.wei.toString(),
       formatted: total.formatted,
+      hubBurn: {
+        totalFormatted: hubBurn.totalFormatted,
+        totalWei: hubBurn.totalWei.toString(),
+        lastBurnAt: hubBurn.lastBurnAt,
+      },
       rescores,
     })
   } catch (err) {
@@ -36,10 +45,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const [total, rescores, projects] = await Promise.all([
+  const [total, rescores, projects, hubBurn] = await Promise.all([
     getBurnTotal(),
     getRescoreTotal(),
     getApproved(),
+    getHubBurnCache(),
   ])
   const byApp = await Promise.all(
     projects.map(async p => {
@@ -62,6 +72,14 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     total: total.wei.toString(),
     formatted: total.formatted,
+    hubBurn: hubBurn
+      ? {
+          totalFormatted: hubBurn.totalFormatted,
+          totalWei: hubBurn.totalWei.toString(),
+          lastBurnAt: hubBurn.lastBurnAt,
+          updatedAt: hubBurn.updatedAt,
+        }
+      : null,
     rescores,
     byApp: byApp.filter(Boolean),
   })
