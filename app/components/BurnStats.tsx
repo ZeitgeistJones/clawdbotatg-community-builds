@@ -58,11 +58,6 @@ export default function BurnStats({ totalFormatted, lastBurnAt, pending }: Props
             receiver={app.receiverAddress}
             onSuccess={() => router.refresh()}
           />
-          {app.appUrl && (
-            <a href={app.appUrl} target="_blank" rel="noopener noreferrer" className={styles.linkBtn}>
-              app ↗
-            </a>
-          )}
         </div>
       ))}
     </div>
