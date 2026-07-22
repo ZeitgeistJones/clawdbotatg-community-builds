@@ -24,22 +24,20 @@ export interface PendingBurnApp {
 function buildBurnAppEntries(projectList: Project[]): BurnAppEntry[] {
   const knownHosts = new Set(BURN_APPS.map(e => e.host).filter(Boolean))
 
-  const fromProjects: BurnAppEntry[] = projectList
-    .map(p => {
-      const host = normalizeProjectUrl(p.url)
-      if (knownHosts.has(host)) return null // already covered by BURN_APPS, don't double-count
-      const config = resolveBurnConfig(p.url, p.burnConfig)
-      if (!config?.receiverAddress) return null
-      return {
-        id: p.id,
-        host,
-        attributionAddress: config.receiverAddress,
-        receiverAddress: config.receiverAddress,
-        executeSelector: config.executeSelector as `0x${string}` | undefined,
-        appUrl: p.url,
-      } satisfies BurnAppEntry
-    })
-    .filter((e): e is BurnAppEntry => e !== null)
+  const fromProjects: BurnAppEntry[] = projectList.flatMap(p => {
+    const host = normalizeProjectUrl(p.url)
+    if (knownHosts.has(host)) return [] // already covered by BURN_APPS, don't double-count
+    const config = resolveBurnConfig(p.url, p.burnConfig)
+    if (!config?.receiverAddress) return []
+    return [{
+      id: p.id,
+      host,
+      attributionAddress: config.receiverAddress,
+      receiverAddress: config.receiverAddress,
+      executeSelector: config.executeSelector as `0x${string}` | undefined,
+      appUrl: p.url,
+    } satisfies BurnAppEntry]
+  })
 
   return [...BURN_APPS, ...fromProjects]
 }
