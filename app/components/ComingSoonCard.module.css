@@ -93,3 +93,16 @@
   flex-shrink: 0;
   opacity: 0.5;
 }
+
+@media (min-width: 1024px) {
+  .card {
+    padding: 0.75rem;
+    min-height: 160px;
+  }
+
+  .emoji {
+    font-size: 26px;
+    margin-top: 1rem;
+    margin-bottom: 0.4rem;
+  }
+}

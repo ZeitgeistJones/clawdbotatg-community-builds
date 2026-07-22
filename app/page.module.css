@@ -1,5 +1,5 @@
 .wrap {
-  max-width: 760px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 3rem 1.5rem 4rem;
 }
@@ -232,3 +232,44 @@
 }
 
 .footer a { color: var(--accent); }
+
+@media (min-width: 1024px) {
+  .wrap {
+    padding: 1.75rem 2rem 2.5rem;
+  }
+
+  .header {
+    margin-bottom: 1.25rem;
+  }
+
+  .logoImg {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    margin-bottom: 0.5rem;
+  }
+
+  .grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+
+  .card {
+    padding: 0.75rem;
+    min-height: 160px;
+  }
+
+  .emoji {
+    font-size: 26px;
+    margin-top: 1rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .disclaimer {
+    margin-top: 1.5rem;
+  }
+
+  .footer {
+    margin-top: 1rem;
+  }
+}
