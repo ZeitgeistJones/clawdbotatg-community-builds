@@ -1,5 +1,5 @@
 import { CLAWD_TOKEN, DEAD_ADDRESS } from '@/lib/burnConfig'
-import { BURN_APPS } from '@/lib/burnApps'
+import { BURN_APPS, type BurnAppEntry } from '@/lib/burnApps'
 import { formatClawdAmount } from '@/lib/burnIndexer'
 
 const CLAWD = CLAWD_TOKEN.toLowerCase()
@@ -102,11 +102,11 @@ export function getReceiverTxDebug() {
   return lastReceiverDebug
 }
 
-/** Scan txs sent TO each app contract — reliable for execute() burns */
-async function fetchBurnsViaReceiverTxs(): Promise<OnChainBurnTotals> {
+/** Scan txs sent TO each app contract — reliable for execute()/executeBurn() burns */
+async function fetchBurnsViaReceiverTxs(apps: BurnAppEntry[]): Promise<OnChainBurnTotals> {
   const started = Date.now()
   const byAppWei: Record<string, bigint> = {}
-  for (const app of BURN_APPS) byAppWei[app.id] = 0n
+  for (const app of apps) byAppWei[app.id] = 0n
 
   let totalWei = 0n
   let lastBurnAt: number | null = null
@@ -118,7 +118,7 @@ async function fetchBurnsViaReceiverTxs(): Promise<OnChainBurnTotals> {
   const uniqueTxs = new Set<string>()
   let stoppedReason = 'complete'
 
-  for (const app of BURN_APPS) {
+  for (const app of apps) {
     let url: string | null = `${BLOCKSCOUT}/addresses/${app.attributionAddress}/transactions`
 
     for (let page = 0; page < 20 && url; page++) {
@@ -183,7 +183,7 @@ async function fetchBurnsViaReceiverTxs(): Promise<OnChainBurnTotals> {
   }
 
   const byApp: OnChainBurnTotals['byApp'] = {}
-  for (const app of BURN_APPS) {
+  for (const app of apps) {
     const wei = byAppWei[app.id] || 0n
     byApp[app.id] = { wei, formatted: formatClawdAmount(wei) }
   }
@@ -192,8 +192,8 @@ async function fetchBurnsViaReceiverTxs(): Promise<OnChainBurnTotals> {
 }
 
 /** Sum CLAWD → dead for registered hub apps (receiver tx scan — stable) */
-export async function fetchOnChainBurnTotals(): Promise<OnChainBurnTotals> {
-  return fetchBurnsViaReceiverTxs()
+export async function fetchOnChainBurnTotals(apps: BurnAppEntry[] = BURN_APPS): Promise<OnChainBurnTotals> {
+  return fetchBurnsViaReceiverTxs(apps)
 }
 
 /** Legacy global dead-address scan — kept for debug comparison only */

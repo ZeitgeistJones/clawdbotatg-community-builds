@@ -41,6 +41,11 @@ export const BURN_APP_CONFIGS: Record<string, BurnConfig> = {
     rescorePaymentWei: 8000000000000n,
     startBlock: 48130514,
   },
+  'clawd-dca.vercel.app': {
+    mode: 'direct',
+    receiverAddress: '0xDB5Da5B9C55D5FC72EB19692aB41Aabbc46278AC',
+    startBlock: 30000000,
+  },
 }
 
 export function normalizeProjectUrl(url: string): string {
