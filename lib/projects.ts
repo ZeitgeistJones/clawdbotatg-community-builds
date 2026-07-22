@@ -200,6 +200,20 @@ export async function updateProjectDesc(id: string, desc: string): Promise<void>
   return updateProjectFields(id, { desc })
 }
 
+export async function updateProjectBurnConfig(id: string, burnConfig: BurnConfig | null): Promise<void> {
+  if (id.startsWith('seed-')) {
+    throw new Error('Seed project burnConfig is edited in lib/projects.ts / BURN_APP_CONFIGS directly')
+  }
+  const project = await kv.get<Project>(`project:${id}`)
+  if (!project) throw new Error('Project not found')
+  if (burnConfig === null) {
+    const { burnConfig: _removed, ...rest } = project
+    await kv.set(`project:${id}`, rest)
+    return
+  }
+  await kv.set(`project:${id}`, { ...project, burnConfig })
+}
+
 const SEED_PROJECTS: Project[] = [
   {
     id: 'seed-1',

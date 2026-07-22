@@ -4,15 +4,33 @@ export interface BurnConfig {
   poolAddress?: `0x${string}`
   /** execute() selector on receiver contract */
   executeSelector?: string
-  /** Rescore payment in wei (0.000008 ETH) */
-  rescorePaymentWei?: bigint
+  /**
+   * Rescore payment in wei (0.000008 ETH).
+   * Stored as a string wherever this travels through JSON/KV (project.burnConfig,
+   * the autofill draft, admin edits) since JSON can't hold a literal bigint.
+   * Only the static BURN_APP_CONFIGS below use real bigint literals in code.
+   * resolveBurnConfig() normalizes either shape to bigint before returning.
+   */
+  rescorePaymentWei?: bigint | string
   startBlock?: number
+  /**
+   * 'execute' (default): the clawdbotatg batch-burn pattern — only counts a Transfer
+   * if it happened inside a transaction that called `executeSelector` on `receiverAddress`.
+   * Use this for apps built on your own shared receiver contract (e.g. The Build Report).
+   *
+   * 'direct': just sums every CLAWD Transfer from `receiverAddress` (and `poolAddress`,
+   * if set) straight to a burn destination — no selector check, no rescore tracking.
+   * Use this for third-party apps you don't control, where you only know the wallet/
+   * contract that does the burning (same approach as Ash Ledger).
+   */
+  mode?: 'execute' | 'direct'
 }
 
 /** CLAWD on Base */
 export const CLAWD_TOKEN = '0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07' as const
 
 export const DEAD_ADDRESS = '0x000000000000000000000000000000000000dEaD' as const
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const
 
 /** Per-app burn indexing config, matched by normalized project URL */
 export const BURN_APP_CONFIGS: Record<string, BurnConfig> = {
@@ -34,15 +52,30 @@ export function normalizeProjectUrl(url: string): string {
   }
 }
 
+function normalizeRescorePaymentWei(v?: bigint | string): bigint | undefined {
+  if (v === undefined || v === null || v === '') return undefined
+  return typeof v === 'string' ? BigInt(v) : v
+}
+
 export function resolveBurnConfig(
   url: string,
   inline?: BurnConfig,
-): (BurnConfig & { host: string }) | null {
+): (Omit<BurnConfig, 'rescorePaymentWei'> & { rescorePaymentWei?: bigint; host: string }) | null {
   if (inline?.receiverAddress) {
-    return { ...inline, host: normalizeProjectUrl(url) }
+    return {
+      ...inline,
+      mode: inline.mode || 'execute',
+      rescorePaymentWei: normalizeRescorePaymentWei(inline.rescorePaymentWei),
+      host: normalizeProjectUrl(url),
+    }
   }
   const host = normalizeProjectUrl(url)
   const config = BURN_APP_CONFIGS[host]
   if (!config) return null
-  return { ...config, host }
+  return {
+    ...config,
+    mode: config.mode || 'execute',
+    rescorePaymentWei: normalizeRescorePaymentWei(config.rescorePaymentWei),
+    host,
+  }
 }

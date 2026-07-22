@@ -114,6 +114,44 @@ Respond with ONLY the sentence. No quotes, no preamble, no trailing period requi
   }
 }
 
+export interface BurnConfigDraft {
+  mode?: 'execute' | 'direct'
+  receiverAddress?: string
+  poolAddress?: string
+  executeSelector?: string
+  rescorePaymentWei?: string
+  startBlock?: number
+}
+
+// Convention: a burning app can optionally expose GET {url}/api/burn-config returning
+// { receiverAddress, poolAddress?, executeSelector?, rescorePaymentWei?, startBlock?, mode? }.
+// mode defaults to 'direct' (a plain sum of Transfers to a burn destination) unless the
+// site explicitly says 'execute' (the clawdbotatg shared-receiver batch-burn pattern).
+// rescorePaymentWei should be sent as a string/number (wei) — it's coerced to a string
+// here since it flows into KV/JSON, which can't hold a literal bigint.
+export async function fetchBurnConfig(url: string): Promise<BurnConfigDraft | null> {
+  try {
+    const base = url.replace(/\/$/, '')
+    const res = await fetch(`${base}/api/burn-config`, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data?.receiverAddress || typeof data.receiverAddress !== 'string') return null
+    return {
+      mode: data.mode === 'execute' ? 'execute' : 'direct',
+      receiverAddress: data.receiverAddress,
+      poolAddress: typeof data.poolAddress === 'string' ? data.poolAddress : undefined,
+      executeSelector: typeof data.executeSelector === 'string' ? data.executeSelector : undefined,
+      rescorePaymentWei: data.rescorePaymentWei != null ? String(data.rescorePaymentWei) : undefined,
+      startBlock: typeof data.startBlock === 'number' ? data.startBlock : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
 export interface AutofillResult {
   name: string
   desc: string
@@ -121,9 +159,11 @@ export interface AutofillResult {
   tag: 'tool' | 'game' | 'data' | 'social'
   buildStatus: BuildStatus
   featureTags?: FeatureTag[]
+  burnConfig?: BurnConfigDraft
   url: string
   source: {
     hasStatusEndpoint: boolean
+    hasBurnConfigEndpoint: boolean
     descFromClaude: boolean
   }
 }
@@ -144,9 +184,10 @@ export async function autofillProject(rawUrl: string): Promise<AutofillResult> {
     throw new Error('Invalid URL')
   }
 
-  const [status, meta] = await Promise.all([
+  const [status, meta, burnConfig] = await Promise.all([
     fetchAppStatusBounded(url),
     fetchPageMeta(url),
+    fetchBurnConfig(url),
   ])
 
   // Strip a trailing "| Site Name" or "- Site Name" suffix some titles have
@@ -154,16 +195,24 @@ export async function autofillProject(rawUrl: string): Promise<AutofillResult> {
 
   const { text: desc, fromClaude } = await generateDescription(name, meta)
 
+  // If we found a burn contract but no explicit feature tags, flag it as burning CLAWD
+  const featureTags = status?.featureTags
+  const withBurnTag = burnConfig?.receiverAddress && !featureTags?.some(t => t.type === 'burns_clawd')
+    ? [...(featureTags || []), { type: 'burns_clawd' as const, label: 'burns CLAWD' }]
+    : featureTags
+
   return {
     name,
     desc: desc || '',
     emoji: '🛠️',
     tag: 'tool',
     buildStatus: status?.buildStatus || 'building',
-    featureTags: status?.featureTags,
+    featureTags: withBurnTag,
+    burnConfig: burnConfig || undefined,
     url,
     source: {
       hasStatusEndpoint: !!status,
+      hasBurnConfigEndpoint: !!burnConfig,
       descFromClaude: fromClaude,
     },
   }

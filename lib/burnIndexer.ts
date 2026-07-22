@@ -5,6 +5,7 @@ import { getApproved, type Project } from '@/lib/projects'
 import {
   CLAWD_TOKEN,
   DEAD_ADDRESS,
+  ZERO_ADDRESS,
   resolveBurnConfig,
   type BurnConfig,
 } from '@/lib/burnConfig'
@@ -89,6 +90,7 @@ export interface SyncResult {
 async function fetchLogsForFrom(
   client: ReturnType<typeof getPublicClient>,
   from: `0x${string}`,
+  toAddresses: readonly `0x${string}`[],
   fromBlock: bigint,
   toBlock: bigint,
 ) {
@@ -103,7 +105,7 @@ async function fetchLogsForFrom(
         const chunk = await client.getLogs({
           address: CLAWD_TOKEN,
           event: TRANSFER_EVENT,
-          args: { from, to: DEAD_ADDRESS },
+          args: { from, to: toAddresses as `0x${string}`[] },
           fromBlock: start,
           toBlock: end,
         })
@@ -149,6 +151,7 @@ async function processClawdBurnLogs(
   logs: Awaited<ReturnType<typeof fetchLogsForFrom>>,
   receiver: `0x${string}`,
   executeSelector: string,
+  mode: 'execute' | 'direct',
 ) {
   const executeCache = new Map<string, boolean>()
   let newBurns = 0n
@@ -158,8 +161,12 @@ async function processClawdBurnLogs(
     const dedupKey = `${txHash}:${log.logIndex}`
     if (await kv.sismember(burnTxKey(projectId), dedupKey)) continue
 
-    const isExecute = await isExecuteTx(client, txHash, receiver, executeSelector, executeCache)
-    if (!isExecute) continue
+    if (mode === 'execute') {
+      const isExecute = await isExecuteTx(client, txHash, receiver, executeSelector, executeCache)
+      if (!isExecute) continue
+    }
+    // 'direct' mode: any Transfer from this address straight to a burn destination counts —
+    // no execute() selector to check, since third-party apps don't use that mechanic.
 
     newBurns += log.args.value ?? 0n
     await kv.sadd(burnTxKey(projectId), dedupKey)
@@ -327,6 +334,7 @@ export async function syncProjectBurns(
   const config = resolveBurnConfig(project.url, (project as Project & { burnConfig?: BurnConfig }).burnConfig)
   if (!config) return null
 
+  const mode = config.mode || 'execute'
   const client = getPublicClient()
   const latestBlock = await client.getBlockNumber()
   const startBlock = BigInt(config.startBlock ?? 0)
@@ -336,7 +344,9 @@ export async function syncProjectBurns(
   let newRescores = 0
   let rescoreWarning: string | undefined
 
-  if (options?.fullBackfill) {
+  // Rescore tracking is a clawdbotatg-specific mechanic (paying to re-run a score) —
+  // only makes sense in 'execute' mode, never for a third-party app's own burn flow.
+  if (mode === 'execute' && options?.fullBackfill) {
     const pageState = await kv.get<string>(rescorePageKey(project.id))
     if (pageState !== 'done') {
       try {
@@ -386,9 +396,13 @@ export async function syncProjectBurns(
     config.receiverAddress,
   ].filter(Boolean) as `0x${string}`[]
 
+  // 'direct' mode also watches burns sent to the zero address, not just 0xdead —
+  // third-party contracts aren't guaranteed to use the same destination clawdbotatg does.
+  const toAddresses = mode === 'direct' ? [DEAD_ADDRESS, ZERO_ADDRESS] : [DEAD_ADDRESS]
+
   const allBurnLogs = []
   for (const from of fromAddresses) {
-    const logs = await fetchLogsForFrom(client, from, fromBlock, toBlock)
+    const logs = await fetchLogsForFrom(client, from, toAddresses, fromBlock, toBlock)
     allBurnLogs.push(...logs)
     await sleep(RPC_DELAY_MS)
   }
@@ -399,6 +413,7 @@ export async function syncProjectBurns(
     allBurnLogs,
     config.receiverAddress,
     executeSelector,
+    mode,
   )
 
   const burnScanComplete = toBlock >= latestBlock
