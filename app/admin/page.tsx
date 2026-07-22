@@ -71,6 +71,10 @@ function AdminInner() {
   const [draft, setDraft] = useState<QuickAddDraft | null>(null)
   const [adding, setAdding] = useState(false)
 
+  const [editingInfoId, setEditingInfoId] = useState<string | null>(null)
+  const [infoForm, setInfoForm] = useState<{ name: string; builder: string }>({ name: '', builder: '' })
+  const [savingInfo, setSavingInfo] = useState(false)
+
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
     Promise.all([
@@ -188,6 +192,30 @@ function AdminInner() {
 
   function setDraftField<K extends keyof QuickAddDraft>(field: K, value: QuickAddDraft[K]) {
     setDraft(d => d ? { ...d, [field]: value } : d)
+  }
+
+  function startEditInfo(p: { id: string; name: string; builder: string }) {
+    setEditingInfoId(p.id)
+    setInfoForm({ name: p.name, builder: p.builder })
+  }
+
+  async function saveInfo(id: string) {
+    if (!infoForm.name.trim() || !infoForm.builder.trim()) return
+    setSavingInfo(true)
+    try {
+      const res = await fetch('/api/admin/update-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name: infoForm.name.trim(), builder: infoForm.builder.trim(), key }),
+      })
+      if (res.ok) {
+        setApproved(a => a.map(p => p.id === id ? { ...p, name: infoForm.name.trim(), builder: infoForm.builder.trim() } : p))
+        setEditingInfoId(null)
+      }
+    } catch {
+      // leave the edit form open so they can retry
+    }
+    setSavingInfo(false)
   }
 
   async function syncBurns(fullBackfill: boolean) {
@@ -422,11 +450,33 @@ function AdminInner() {
                   <div className={styles.cardTop}>
                     <span className={styles.emoji}>{p.emoji}</span>
                     <div className={styles.cardInfo}>
-                      <div className={styles.cardName}>
-                        {p.name}
-                        {p.id.startsWith('seed-') && <span className={styles.seedBadge}>original</span>}
-                      </div>
-                      <div className={styles.cardBuilder}>by {p.builder}</div>
+                      {editingInfoId === p.id ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
+                          <input type="text" value={infoForm.name}
+                            onChange={e => setInfoForm(f => ({ ...f, name: e.target.value }))}
+                            placeholder="project name"
+                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit', fontWeight: 600 }} />
+                          <input type="text" value={infoForm.builder}
+                            onChange={e => setInfoForm(f => ({ ...f, builder: e.target.value }))}
+                            placeholder="builder name / handle"
+                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'inherit' }} />
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button className={styles.statusBtn} onClick={() => saveInfo(p.id)} disabled={savingInfo}>
+                              {savingInfo ? 'saving…' : 'save'}
+                            </button>
+                            <button className={styles.statusBtn} onClick={() => setEditingInfoId(null)}>cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={styles.cardName}>
+                          {p.name}
+                          {p.id.startsWith('seed-') && <span className={styles.seedBadge}>original</span>}
+                          {!p.id.startsWith('seed-') && (
+                            <button className={styles.statusBtn} style={{ marginLeft: '8px' }} onClick={() => startEditInfo(p)}>edit</button>
+                          )}
+                        </div>
+                      )}
+                      {editingInfoId !== p.id && <div className={styles.cardBuilder}>by {p.builder}</div>}
                       <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.cardUrl}>{p.url}</a>
                     </div>
                     <div className={styles.cardActions}>

@@ -187,13 +187,17 @@ export async function updateProjectMeta(id: string, meta: Partial<ProjectMeta>):
   await kv.set(`project:${id}`, { ...project, ...meta })
 }
 
-export async function updateProjectDesc(id: string, desc: string): Promise<void> {
+export async function updateProjectFields(id: string, fields: Partial<Pick<Project, 'name' | 'builder' | 'desc'>>): Promise<void> {
   if (id.startsWith('seed-')) {
-    throw new Error('Seed project descriptions are edited in lib/projects.ts')
+    throw new Error('Seed project name/builder/desc are edited in lib/projects.ts directly')
   }
   const project = await kv.get<Project>(`project:${id}`)
   if (!project) throw new Error('Project not found')
-  await kv.set(`project:${id}`, { ...project, desc })
+  await kv.set(`project:${id}`, { ...project, ...fields })
+}
+
+export async function updateProjectDesc(id: string, desc: string): Promise<void> {
+  return updateProjectFields(id, { desc })
 }
 
 const SEED_PROJECTS: Project[] = [
