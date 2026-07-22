@@ -27,7 +27,18 @@ interface ComingSoonItem {
   url?: string
 }
 
-const BUILD_STATUSES = ['building', 'beta', 'v1', 'offline']
+interface QuickAddDraft {
+  name: string
+  desc: string
+  emoji: string
+  tag: string
+  buildStatus: string
+  featureTags?: { type: string; label: string; value?: string }[]
+  url: string
+  source: { hasStatusEndpoint: boolean; descFromClaude: boolean }
+}
+
+const BUILD_STATUSES = ['building', 'beta', 'v1', 'v2', 'v3', 'v4', 'offline']
 const EMOJIS = ['⏳','🛠️','🗣️','👁️','📊','🔐','🎮','🌐','🤖','💎','🔥','⚡','🧠','🎯','🪄','🦾','🚀']
 
 const EMPTY_CS: ComingSoonItem = { id: '', name: '', desc: '', emoji: '⏳', teaser: '', url: '' }
@@ -53,6 +64,16 @@ function AdminInner() {
   const [syncingBurns, setSyncingBurns] = useState(false)
   const [burnStatus, setBurnStatus] = useState<string | null>(null)
   const [burnError, setBurnError] = useState<string | null>(null)
+
+  const [quickUrl, setQuickUrl] = useState('')
+  const [autofilling, setAutofilling] = useState(false)
+  const [autofillError, setAutofillError] = useState<string | null>(null)
+  const [draft, setDraft] = useState<QuickAddDraft | null>(null)
+  const [adding, setAdding] = useState(false)
+
+  const [editingInfoId, setEditingInfoId] = useState<string | null>(null)
+  const [infoForm, setInfoForm] = useState<{ name: string; builder: string }>({ name: '', builder: '' })
+  const [savingInfo, setSavingInfo] = useState(false)
 
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
@@ -116,6 +137,85 @@ function AdminInner() {
     })
     if (res.ok) setApproved(a => a.filter(p => p.id !== id))
     setActing(null)
+  }
+
+  async function runAutofill() {
+    if (!quickUrl) return
+    setAutofilling(true)
+    setAutofillError(null)
+    setDraft(null)
+    try {
+      const res = await fetch('/api/admin/autofill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: quickUrl, key }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAutofillError(data.error || 'Autofill failed')
+        return
+      }
+      setDraft(data)
+    } catch {
+      setAutofillError('Network error during autofill')
+    } finally {
+      setAutofilling(false)
+    }
+  }
+
+  async function submitQuickAdd() {
+    if (!draft || !draft.name || !draft.url) return
+    setAdding(true)
+    setAutofillError(null)
+    try {
+      const res = await fetch('/api/admin/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...draft, key }),
+      })
+      if (res.ok) {
+        const project = await res.json()
+        setApproved(a => [project, ...a])
+        setDraft(null)
+        setQuickUrl('')
+        setTab('approved')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setAutofillError(data.error || 'Could not add project')
+      }
+    } catch {
+      setAutofillError('Network error while adding')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  function setDraftField<K extends keyof QuickAddDraft>(field: K, value: QuickAddDraft[K]) {
+    setDraft(d => d ? { ...d, [field]: value } : d)
+  }
+
+  function startEditInfo(p: { id: string; name: string; builder: string }) {
+    setEditingInfoId(p.id)
+    setInfoForm({ name: p.name, builder: p.builder })
+  }
+
+  async function saveInfo(id: string) {
+    if (!infoForm.name.trim() || !infoForm.builder.trim()) return
+    setSavingInfo(true)
+    try {
+      const res = await fetch('/api/admin/update-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name: infoForm.name.trim(), builder: infoForm.builder.trim(), key }),
+      })
+      if (res.ok) {
+        setApproved(a => a.map(p => p.id === id ? { ...p, name: infoForm.name.trim(), builder: infoForm.builder.trim() } : p))
+        setEditingInfoId(null)
+      }
+    } catch {
+      // leave the edit form open so they can retry
+    }
+    setSavingInfo(false)
   }
 
   async function syncBurns(fullBackfill: boolean) {
@@ -225,6 +325,77 @@ function AdminInner() {
         )}
         {burnStatus && <div className={styles.burnStatus}>{burnStatus}</div>}
         {burnError && <div className={styles.burnError}>{burnError}</div>}
+
+        {/* QUICK ADD */}
+        <div className={styles.card} style={{ marginBottom: '1rem' }}>
+          <div className={styles.statusLabel} style={{ marginBottom: '8px' }}>🔗 quick add from link</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="url"
+              placeholder="https://someapp.vercel.app"
+              value={quickUrl}
+              onChange={e => setQuickUrl(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && quickUrl && !autofilling) runAutofill() }}
+              style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }}
+            />
+            <button className={styles.approveBtn} onClick={runAutofill} disabled={!quickUrl || autofilling}>
+              {autofilling ? 'reading site…' : 'autofill'}
+            </button>
+          </div>
+          {autofillError && <p className={styles.error}>{autofillError}</p>}
+
+          {draft && (
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select value={draft.emoji} onChange={e => setDraftField('emoji', e.target.value)}
+                  style={{ width: '70px', padding: '8px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '16px', fontFamily: 'inherit' }}>
+                  {EMOJIS.map(em => <option key={em} value={em}>{em}</option>)}
+                </select>
+                <input type="text" placeholder="name" value={draft.name}
+                  onChange={e => setDraftField('name', e.target.value)}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
+                <select value={draft.tag} onChange={e => setDraftField('tag', e.target.value)}
+                  style={{ padding: '8px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }}>
+                  <option value="tool">tool</option>
+                  <option value="data">data</option>
+                  <option value="game">game</option>
+                  <option value="social">social</option>
+                </select>
+              </div>
+              <textarea placeholder="description" value={draft.desc} rows={2}
+                onChange={e => setDraftField('desc', e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit', resize: 'none' }} />
+              <div className={styles.statusRow}>
+                {BUILD_STATUSES.map(s => (
+                  <button key={s}
+                    className={`${styles.statusBtn} ${draft.buildStatus === s ? styles.statusBtnActive : ''}`}
+                    onClick={() => setDraftField('buildStatus', s)}>
+                    {s}
+                  </button>
+                ))}
+                <input type="text" placeholder="custom…" className={styles.customInput}
+                  value={BUILD_STATUSES.includes(draft.buildStatus) ? '' : draft.buildStatus}
+                  onChange={e => setDraftField('buildStatus', e.target.value)}
+                />
+              </div>
+              <div className={styles.cardWallet}>
+                {draft.source.hasStatusEndpoint ? '✓ pulled live status/tags from /api/status' : 'no /api/status found on that site — check tags manually'}
+                {' · '}
+                {draft.source.descFromClaude ? 'description drafted by claude' : 'description scraped from page meta tags'}
+              </div>
+              {draft.featureTags && draft.featureTags.length > 0 && (
+                <div className={styles.cardWallet}>tags: {draft.featureTags.map(t => t.label).join(', ')}</div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className={styles.approveBtn} onClick={submitQuickAdd} disabled={adding || !draft.name}>
+                  {adding ? 'adding…' : '+ add to hub'}
+                </button>
+                <button className={styles.rejectBtn} onClick={() => setDraft(null)}>cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className={styles.tabs}>
           <button className={`${styles.tab} ${tab === 'pending' ? styles.tabActive : ''}`} onClick={() => setTab('pending')}>
             pending {pending.length > 0 && <span className={styles.badge}>{pending.length}</span>}
@@ -279,11 +450,33 @@ function AdminInner() {
                   <div className={styles.cardTop}>
                     <span className={styles.emoji}>{p.emoji}</span>
                     <div className={styles.cardInfo}>
-                      <div className={styles.cardName}>
-                        {p.name}
-                        {p.id.startsWith('seed-') && <span className={styles.seedBadge}>original</span>}
-                      </div>
-                      <div className={styles.cardBuilder}>by {p.builder}</div>
+                      {editingInfoId === p.id ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
+                          <input type="text" value={infoForm.name}
+                            onChange={e => setInfoForm(f => ({ ...f, name: e.target.value }))}
+                            placeholder="project name"
+                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit', fontWeight: 600 }} />
+                          <input type="text" value={infoForm.builder}
+                            onChange={e => setInfoForm(f => ({ ...f, builder: e.target.value }))}
+                            placeholder="builder name / handle"
+                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'inherit' }} />
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button className={styles.statusBtn} onClick={() => saveInfo(p.id)} disabled={savingInfo}>
+                              {savingInfo ? 'saving…' : 'save'}
+                            </button>
+                            <button className={styles.statusBtn} onClick={() => setEditingInfoId(null)}>cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={styles.cardName}>
+                          {p.name}
+                          {p.id.startsWith('seed-') && <span className={styles.seedBadge}>original</span>}
+                          {!p.id.startsWith('seed-') && (
+                            <button className={styles.statusBtn} style={{ marginLeft: '8px' }} onClick={() => startEditInfo(p)}>edit</button>
+                          )}
+                        </div>
+                      )}
+                      {editingInfoId !== p.id && <div className={styles.cardBuilder}>by {p.builder}</div>}
                       <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.cardUrl}>{p.url}</a>
                     </div>
                     <div className={styles.cardActions}>
@@ -433,3 +626,4 @@ export default function AdminPage() {
     </Suspense>
   )
 }
+
