@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, type Dispatch, type SetStateAction } from 'react'
 import { useSearchParams } from 'next/navigation'
 import styles from './admin.module.css'
 
@@ -15,6 +15,14 @@ interface Project {
   walletAddress?: string
   status: string
   buildStatus?: string
+  burnConfig?: {
+    mode?: 'execute' | 'direct'
+    receiverAddress?: string
+    poolAddress?: string
+    executeSelector?: string
+    rescorePaymentWei?: string | number
+    startBlock?: number
+  }
   submittedAt: number
 }
 
@@ -27,6 +35,15 @@ interface ComingSoonItem {
   url?: string
 }
 
+interface BurnConfigForm {
+  mode: 'execute' | 'direct'
+  receiverAddress: string
+  poolAddress: string
+  executeSelector: string
+  rescorePaymentWei: string
+  startBlock: string
+}
+
 interface QuickAddDraft {
   name: string
   desc: string
@@ -34,14 +51,43 @@ interface QuickAddDraft {
   tag: string
   buildStatus: string
   featureTags?: { type: string; label: string; value?: string }[]
+  burnConfig?: {
+    mode?: 'execute' | 'direct'
+    receiverAddress?: string
+    poolAddress?: string
+    executeSelector?: string
+    rescorePaymentWei?: string
+    startBlock?: number
+  }
   url: string
-  source: { hasStatusEndpoint: boolean; descFromClaude: boolean }
+  source: { hasStatusEndpoint: boolean; hasBurnConfigEndpoint: boolean; descFromClaude: boolean }
+}
+
+const EMPTY_BURN_FORM: BurnConfigForm = {
+  mode: 'direct',
+  receiverAddress: '',
+  poolAddress: '',
+  executeSelector: '',
+  rescorePaymentWei: '',
+  startBlock: '',
 }
 
 const BUILD_STATUSES = ['building', 'beta', 'v1', 'v2', 'v3', 'v4', 'offline']
 const EMOJIS = ['⏳','🛠️','🗣️','👁️','📊','🔐','🎮','🌐','🤖','💎','🔥','⚡','🧠','🎯','🪄','🦾','🚀']
 
 const EMPTY_CS: ComingSoonItem = { id: '', name: '', desc: '', emoji: '⏳', teaser: '', url: '' }
+
+function toBurnForm(cfg?: Project['burnConfig']): BurnConfigForm {
+  if (!cfg?.receiverAddress) return { ...EMPTY_BURN_FORM }
+  return {
+    mode: cfg.mode === 'execute' ? 'execute' : 'direct',
+    receiverAddress: cfg.receiverAddress || '',
+    poolAddress: cfg.poolAddress || '',
+    executeSelector: cfg.executeSelector || '',
+    rescorePaymentWei: cfg.rescorePaymentWei != null ? String(cfg.rescorePaymentWei) : '',
+    startBlock: cfg.startBlock != null ? String(cfg.startBlock) : '',
+  }
+}
 
 function AdminInner() {
   const params = useSearchParams()
@@ -56,7 +102,7 @@ function AdminInner() {
   const [tab, setTab] = useState<'pending' | 'approved' | 'coming-soon'>('pending')
   const [customStatus, setCustomStatus] = useState<Record<string, string>>({})
   const [savingCS, setSavingCS] = useState(false)
-  const [editingCS, setEditingCS] = useState<ComingSoonItem | null>(null) // null = new form
+  const [editingCS, setEditingCS] = useState<ComingSoonItem | null>(null)
   const [burnTotal, setBurnTotal] = useState<string | null>(null)
   const [rescoreTotal, setRescoreTotal] = useState<number | null>(null)
   const [burnByApp, setBurnByApp] = useState<Record<string, string>>({})
@@ -74,6 +120,13 @@ function AdminInner() {
   const [editingInfoId, setEditingInfoId] = useState<string | null>(null)
   const [infoForm, setInfoForm] = useState<{ name: string; builder: string }>({ name: '', builder: '' })
   const [savingInfo, setSavingInfo] = useState(false)
+
+  const [draftBurnForm, setDraftBurnForm] = useState<BurnConfigForm>(EMPTY_BURN_FORM)
+  const [showDraftBurnForm, setShowDraftBurnForm] = useState(false)
+
+  const [editingBurnId, setEditingBurnId] = useState<string | null>(null)
+  const [burnForm, setBurnForm] = useState<BurnConfigForm>(EMPTY_BURN_FORM)
+  const [savingBurn, setSavingBurn] = useState(false)
 
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
@@ -144,6 +197,8 @@ function AdminInner() {
     setAutofilling(true)
     setAutofillError(null)
     setDraft(null)
+    setShowDraftBurnForm(false)
+    setDraftBurnForm(EMPTY_BURN_FORM)
     try {
       const res = await fetch('/api/admin/autofill', {
         method: 'POST',
@@ -156,10 +211,26 @@ function AdminInner() {
         return
       }
       setDraft(data)
+      if (data.burnConfig?.receiverAddress) {
+        setDraftBurnForm(toBurnForm(data.burnConfig))
+        setShowDraftBurnForm(true)
+      }
     } catch {
       setAutofillError('Network error during autofill')
     } finally {
       setAutofilling(false)
+    }
+  }
+
+  function burnFormToConfig(f: BurnConfigForm) {
+    if (!f.receiverAddress.trim()) return undefined
+    return {
+      mode: f.mode,
+      receiverAddress: f.receiverAddress.trim(),
+      poolAddress: f.poolAddress.trim() || undefined,
+      executeSelector: f.mode === 'execute' ? (f.executeSelector.trim() || undefined) : undefined,
+      rescorePaymentWei: f.mode === 'execute' ? (f.rescorePaymentWei.trim() || undefined) : undefined,
+      startBlock: f.startBlock.trim() ? Number(f.startBlock.trim()) : undefined,
     }
   }
 
@@ -171,13 +242,15 @@ function AdminInner() {
       const res = await fetch('/api/admin/quick-add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...draft, key }),
+        body: JSON.stringify({ ...draft, burnConfig: burnFormToConfig(draftBurnForm), key }),
       })
       if (res.ok) {
         const project = await res.json()
         setApproved(a => [project, ...a])
         setDraft(null)
         setQuickUrl('')
+        setDraftBurnForm(EMPTY_BURN_FORM)
+        setShowDraftBurnForm(false)
         setTab('approved')
       } else {
         const data = await res.json().catch(() => ({}))
@@ -192,6 +265,35 @@ function AdminInner() {
 
   function setDraftField<K extends keyof QuickAddDraft>(field: K, value: QuickAddDraft[K]) {
     setDraft(d => d ? { ...d, [field]: value } : d)
+  }
+
+  function startEditBurn(id: string, existing?: BurnConfigForm) {
+    setEditingBurnId(id)
+    setBurnForm(existing || { ...EMPTY_BURN_FORM })
+  }
+
+  async function saveBurnConfig(id: string) {
+    setSavingBurn(true)
+    try {
+      const cleaned = burnFormToConfig(burnForm) || null
+      const res = await fetch('/api/admin/update-burn-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, burnConfig: cleaned, key }),
+      })
+      if (res.ok) {
+        setApproved(a => a.map(p => {
+          if (p.id !== id) return p
+          if (cleaned) return { ...p, burnConfig: cleaned }
+          const { burnConfig: _removed, ...rest } = p
+          return rest
+        }))
+        setEditingBurnId(null)
+      }
+    } catch {
+      // leave form open to retry
+    }
+    setSavingBurn(false)
   }
 
   function startEditInfo(p: { id: string; name: string; builder: string }) {
@@ -278,10 +380,8 @@ function AdminInner() {
     if (!item.name) return
     let updated: ComingSoonItem[]
     if (item.id && comingSoon.find(c => c.id === item.id)) {
-      // editing existing
       updated = comingSoon.map(c => c.id === item.id ? item : c)
     } else {
-      // new item
       updated = [...comingSoon, { ...item, id: `cs-${Date.now()}` }]
     }
     setComingSoon(updated)
@@ -386,11 +486,29 @@ function AdminInner() {
               {draft.featureTags && draft.featureTags.length > 0 && (
                 <div className={styles.cardWallet}>tags: {draft.featureTags.map(t => t.label).join(', ')}</div>
               )}
+
+              <div className={styles.cardWallet}>
+                {draft.source.hasBurnConfigEndpoint
+                  ? '🔥 burn config detected from /api/burn-config'
+                  : 'no /api/burn-config found — add burn details manually if this app burns CLAWD'}
+                {' '}
+                <button className={styles.statusBtn} style={{ marginLeft: '6px' }} onClick={() => setShowDraftBurnForm(s => !s)}>
+                  {showDraftBurnForm ? 'hide' : draftBurnForm.receiverAddress ? 'edit burn config' : 'add burn config'}
+                </button>
+              </div>
+              {showDraftBurnForm && (
+                <BurnConfigFields form={draftBurnForm} setForm={setDraftBurnForm} />
+              )}
+
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button className={styles.approveBtn} onClick={submitQuickAdd} disabled={adding || !draft.name}>
                   {adding ? 'adding…' : '+ add to hub'}
                 </button>
-                <button className={styles.rejectBtn} onClick={() => setDraft(null)}>cancel</button>
+                <button className={styles.rejectBtn} onClick={() => {
+                  setDraft(null)
+                  setDraftBurnForm(EMPTY_BURN_FORM)
+                  setShowDraftBurnForm(false)
+                }}>cancel</button>
               </div>
             </div>
           )}
@@ -462,7 +580,7 @@ function AdminInner() {
                             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'inherit' }} />
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button className={styles.statusBtn} onClick={() => saveInfo(p.id)} disabled={savingInfo}>
-                              {savingInfo ? 'saving…' : 'save'}
+                              {savingInfo ? 'saving…' : 'save changes'}
                             </button>
                             <button className={styles.statusBtn} onClick={() => setEditingInfoId(null)}>cancel</button>
                           </div>
@@ -519,6 +637,25 @@ function AdminInner() {
                     {(rescoresByApp[p.id] ?? 0) > 0 && (
                       <div className={styles.burnAppTotal}>📊 {rescoresByApp[p.id]} rescores (burn batches pending)</div>
                     )}
+                    {!p.id.startsWith('seed-') && (
+                      <div style={{ marginTop: '8px' }}>
+                        {editingBurnId === p.id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <BurnConfigFields form={burnForm} setForm={setBurnForm} />
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button className={styles.approveBtn} onClick={() => saveBurnConfig(p.id)} disabled={savingBurn}>
+                                {savingBurn ? 'saving…' : 'save changes'}
+                              </button>
+                              <button className={styles.statusBtn} onClick={() => setEditingBurnId(null)}>cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button className={styles.statusBtn} onClick={() => startEditBurn(p.id, toBurnForm(p.burnConfig))}>
+                            {p.burnConfig?.receiverAddress ? '🔥 edit burn config' : '+ add burn config'}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -528,7 +665,6 @@ function AdminInner() {
       {/* COMING SOON */}
       {tab === 'coming-soon' && (
         <div>
-          {/* existing items */}
           {comingSoon.length > 0 && (
             <div className={styles.list} style={{ marginBottom: '1.5rem' }}>
               {comingSoon.map(c => (
@@ -551,9 +687,9 @@ function AdminInner() {
             </div>
           )}
 
-          {/* add/edit form */}
           <CSForm
-            initial={editingCS || { ...EMPTY_CS }}
+            key={editingCS?.id ?? 'new'}
+            initial={editingCS || EMPTY_CS}
             isEditing={!!editingCS}
             saving={savingCS}
             emojis={EMOJIS}
@@ -563,6 +699,48 @@ function AdminInner() {
         </div>
       )}
     </main>
+  )
+}
+
+function BurnConfigFields({
+  form,
+  setForm,
+}: {
+  form: BurnConfigForm
+  setForm: Dispatch<SetStateAction<BurnConfigForm>>
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', background: '#fafafa', borderRadius: '8px' }}>
+      <div className={styles.statusRow}>
+        <button className={`${styles.statusBtn} ${form.mode === 'direct' ? styles.statusBtnActive : ''}`}
+          onClick={() => setForm(f => ({ ...f, mode: 'direct' }))}>
+          direct (third-party app)
+        </button>
+        <button className={`${styles.statusBtn} ${form.mode === 'execute' ? styles.statusBtnActive : ''}`}
+          onClick={() => setForm(f => ({ ...f, mode: 'execute' }))}>
+          execute() (your shared receiver)
+        </button>
+      </div>
+      <input type="text" placeholder="receiver address (0x...)" value={form.receiverAddress}
+        onChange={e => setForm(f => ({ ...f, receiverAddress: e.target.value }))}
+        style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'monospace' }} />
+      <input type="text" placeholder="pool address (optional, 0x...)" value={form.poolAddress}
+        onChange={e => setForm(f => ({ ...f, poolAddress: e.target.value }))}
+        style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'monospace' }} />
+      {form.mode === 'execute' && (
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input type="text" placeholder="execute selector (optional, 0x...)" value={form.executeSelector}
+            onChange={e => setForm(f => ({ ...f, executeSelector: e.target.value }))}
+            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'monospace' }} />
+          <input type="text" placeholder="rescore payment wei (optional)" value={form.rescorePaymentWei}
+            onChange={e => setForm(f => ({ ...f, rescorePaymentWei: e.target.value }))}
+            style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'monospace' }} />
+        </div>
+      )}
+      <input type="text" placeholder="start block (optional)" value={form.startBlock}
+        onChange={e => setForm(f => ({ ...f, startBlock: e.target.value }))}
+        style={{ width: '150px', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'monospace' }} />
+    </div>
   )
 }
 
@@ -626,4 +804,3 @@ export default function AdminPage() {
     </Suspense>
   )
 }
-
