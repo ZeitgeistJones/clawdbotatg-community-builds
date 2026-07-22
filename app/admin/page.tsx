@@ -38,7 +38,7 @@ interface QuickAddDraft {
   source: { hasStatusEndpoint: boolean; descFromClaude: boolean }
 }
 
-const BUILD_STATUSES = ['building', 'beta', 'v1', 'offline']
+const BUILD_STATUSES = ['building', 'beta', 'v1', 'v2', 'v3', 'v4', 'offline']
 const EMOJIS = ['⏳','🛠️','🗣️','👁️','📊','🔐','🎮','🌐','🤖','💎','🔥','⚡','🧠','🎯','🪄','🦾','🚀']
 
 const EMPTY_CS: ComingSoonItem = { id: '', name: '', desc: '', emoji: '⏳', teaser: '', url: '' }
@@ -345,6 +345,10 @@ function AdminInner() {
                     {s}
                   </button>
                 ))}
+                <input type="text" placeholder="custom…" className={styles.customInput}
+                  value={BUILD_STATUSES.includes(draft.buildStatus) ? '' : draft.buildStatus}
+                  onChange={e => setDraftField('buildStatus', e.target.value)}
+                />
               </div>
               <div className={styles.cardWallet}>
                 {draft.source.hasStatusEndpoint ? '✓ pulled live status/tags from /api/status' : 'no /api/status found on that site — check tags manually'}
