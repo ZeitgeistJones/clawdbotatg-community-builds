@@ -40,7 +40,7 @@
 .burnCounter {
   font-size: 13px;
   font-weight: 600;
-  color: #AA2222;
+  color: var(--burn);
 }
 
 .burnUpdated {
@@ -63,7 +63,7 @@
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  transition: border-color 0.15s, transform 0.12s, background 0.15s;
+  transition: border-color 0.15s, transform 0.12s, background 0.15s, box-shadow 0.15s;
   overflow: hidden;
   cursor: pointer;
   min-height: 200px;
@@ -71,10 +71,18 @@
   color: var(--text);
 }
 
+:global([data-theme="dark"]) .card {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
 .card:hover {
   border-color: var(--border-hover);
   transform: translateY(-2px);
   background: var(--card-hover);
+}
+
+:global([data-theme="dark"]) .card:hover {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 
 .statusBadge {
@@ -169,8 +177,8 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #FFF0E8;
-  color: #B04A10;
+  background: var(--avatar-bg);
+  color: var(--avatar-fg);
   font-size: 8px;
   font-weight: 700;
   display: flex;

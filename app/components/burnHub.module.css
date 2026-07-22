@@ -6,7 +6,7 @@
 .burnCounter {
   font-size: 13px;
   font-weight: 600;
-  color: #AA2222;
+  color: var(--burn);
 }
 
 .burnUpdated {
@@ -52,7 +52,7 @@
   padding: 6px 14px;
   border-radius: 8px;
   border: none;
-  background: #AA2222;
+  background: var(--burn-btn);
   color: #fff;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -91,6 +91,6 @@
 
 .burnError {
   font-size: 10px;
-  color: #AA2222;
+  color: var(--burn);
   max-width: 200px;
 }

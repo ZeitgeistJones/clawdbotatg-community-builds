@@ -12,19 +12,108 @@
   --card-bg: #fafafa;
   --card-hover: #f5f5f5;
   --accent: #FF6B2B;
+  --burn: #C43A2F;
+  --burn-btn: #AA2222;
   --radius: 14px;
+  --avatar-bg: #FFF0E8;
+  --avatar-fg: #B04A10;
+
+  --tag-tool-bg: #FFF0E8;
+  --tag-tool-fg: #B04A10;
+  --tag-game-bg: #EDE8FF;
+  --tag-game-fg: #5533B5;
+  --tag-data-bg: #E5F5EE;
+  --tag-data-fg: #0D6E4A;
+  --tag-social-bg: #FFF0F5;
+  --tag-social-fg: #A02050;
+
+  --status-building-bg: #FFFBE6;
+  --status-building-fg: #92600A;
+  --status-building-dot: #F5A623;
+  --status-beta-bg: #EDE8FF;
+  --status-beta-fg: #5533B5;
+  --status-beta-dot: #7B61FF;
+  --status-v1-bg: #E5F5EE;
+  --status-v1-fg: #0D6E4A;
+  --status-v1-dot: #2ECC71;
+  --status-offline-bg: #F5F5F5;
+  --status-offline-fg: #888888;
+  --status-offline-dot: #BBBBBB;
+  --status-fallback-bg: #F0F0FF;
+  --status-fallback-fg: #444444;
+  --status-fallback-dot: #999999;
+
+  --ft-token-bg: #FFF0E8;
+  --ft-token-fg: #B04A10;
+  --ft-freeuses-bg: #E8F4FF;
+  --ft-freeuses-fg: #1A5FA8;
+  --ft-burns-bg: #FFF0F0;
+  --ft-burns-fg: #AA2222;
+  --ft-paid-bg: #F0FFF0;
+  --ft-paid-fg: #1A6B2A;
+  --ft-free-bg: #F0FFF0;
+  --ft-free-fg: #1A6B2A;
+  --ft-warn-bg: #FFFFF0;
+  --ft-warn-fg: #7A6A00;
+  --ft-custom-bg: #F5F5F5;
+  --ft-custom-fg: #555555;
 }
 
 [data-theme="dark"] {
-  --bg: #0f0f0f;
-  --bg-secondary: #1a1a1a;
-  --text: #f0f0f0;
-  --text-secondary: #aaaaaa;
-  --text-muted: #666666;
-  --border: #2a2a2a;
-  --border-hover: #444444;
-  --card-bg: #1a1a1a;
-  --card-hover: #222222;
+  --bg: #12141a;
+  --bg-secondary: #1a1d26;
+  --text: #eceef2;
+  --text-secondary: #b0b4bf;
+  --text-muted: #8a8f9c;
+  --border: #2a2e3a;
+  --border-hover: #454a5a;
+  --card-bg: #1a1d26;
+  --card-hover: #222632;
+  --accent: #FF7A45;
+  --burn: #E86B5C;
+  --burn-btn: #D94A3D;
+  --avatar-bg: rgba(255, 107, 43, 0.16);
+  --avatar-fg: #FFB088;
+
+  --tag-tool-bg: rgba(255, 122, 69, 0.14);
+  --tag-tool-fg: #FFB088;
+  --tag-game-bg: rgba(123, 97, 255, 0.16);
+  --tag-game-fg: #C4B5FD;
+  --tag-data-bg: rgba(46, 204, 113, 0.12);
+  --tag-data-fg: #7DDBA8;
+  --tag-social-bg: rgba(236, 72, 153, 0.14);
+  --tag-social-fg: #F9A8D4;
+
+  --status-building-bg: rgba(245, 166, 35, 0.14);
+  --status-building-fg: #F0C674;
+  --status-building-dot: #F5A623;
+  --status-beta-bg: rgba(123, 97, 255, 0.16);
+  --status-beta-fg: #C4B5FD;
+  --status-beta-dot: #9B87FF;
+  --status-v1-bg: rgba(46, 204, 113, 0.12);
+  --status-v1-fg: #7DDBA8;
+  --status-v1-dot: #3DDB84;
+  --status-offline-bg: rgba(255, 255, 255, 0.06);
+  --status-offline-fg: #9A9EAB;
+  --status-offline-dot: #6B7080;
+  --status-fallback-bg: rgba(255, 255, 255, 0.06);
+  --status-fallback-fg: #B0B4BF;
+  --status-fallback-dot: #8A8F9C;
+
+  --ft-token-bg: rgba(255, 122, 69, 0.14);
+  --ft-token-fg: #FFB088;
+  --ft-freeuses-bg: rgba(59, 130, 246, 0.14);
+  --ft-freeuses-fg: #93C5FD;
+  --ft-burns-bg: rgba(232, 107, 92, 0.14);
+  --ft-burns-fg: #F0A090;
+  --ft-paid-bg: rgba(46, 204, 113, 0.12);
+  --ft-paid-fg: #7DDBA8;
+  --ft-free-bg: rgba(46, 204, 113, 0.12);
+  --ft-free-fg: #7DDBA8;
+  --ft-warn-bg: rgba(234, 179, 8, 0.12);
+  --ft-warn-fg: #E8D48B;
+  --ft-custom-bg: rgba(255, 255, 255, 0.06);
+  --ft-custom-fg: #B0B4BF;
 }
 
 body {
@@ -33,6 +122,12 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   transition: background 0.2s, color 0.2s;
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 107, 43, 0.08), transparent 55%),
+    var(--bg);
 }
 
 a { color: inherit; text-decoration: none; }
@@ -48,6 +143,12 @@ input, textarea, select {
   color: var(--text);
   outline: none;
   transition: border-color 0.15s;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: var(--bg-secondary);
 }
 
 input:focus, textarea:focus, select:focus {

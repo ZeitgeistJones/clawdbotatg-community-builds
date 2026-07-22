@@ -14,32 +14,36 @@ const kv = new Redis({
 })
 
 const TAG_STYLE: Record<string, { bg: string; color: string }> = {
-  tool:   { bg: '#FFF0E8', color: '#B04A10' },
-  game:   { bg: '#EDE8FF', color: '#5533B5' },
-  data:   { bg: '#E5F5EE', color: '#0D6E4A' },
-  social: { bg: '#FFF0F5', color: '#A02050' },
+  tool:   { bg: 'var(--tag-tool-bg)', color: 'var(--tag-tool-fg)' },
+  game:   { bg: 'var(--tag-game-bg)', color: 'var(--tag-game-fg)' },
+  data:   { bg: 'var(--tag-data-bg)', color: 'var(--tag-data-fg)' },
+  social: { bg: 'var(--tag-social-bg)', color: 'var(--tag-social-fg)' },
 }
 
 const BUILD_STATUS_STYLE: Record<string, { bg: string; color: string; dot: string }> = {
-  building: { bg: '#FFFBE6', color: '#92600A', dot: '#F5A623' },
-  beta:     { bg: '#EDE8FF', color: '#5533B5', dot: '#7B61FF' },
-  v1:       { bg: '#E5F5EE', color: '#0D6E4A', dot: '#2ECC71' },
-  offline:  { bg: '#F5F5F5', color: '#888888', dot: '#BBBBBB' },
+  building: { bg: 'var(--status-building-bg)', color: 'var(--status-building-fg)', dot: 'var(--status-building-dot)' },
+  beta:     { bg: 'var(--status-beta-bg)', color: 'var(--status-beta-fg)', dot: 'var(--status-beta-dot)' },
+  v1:       { bg: 'var(--status-v1-bg)', color: 'var(--status-v1-fg)', dot: 'var(--status-v1-dot)' },
+  offline:  { bg: 'var(--status-offline-bg)', color: 'var(--status-offline-fg)', dot: 'var(--status-offline-dot)' },
 }
 
 const FEATURE_TAG_STYLE: Record<string, { bg: string; color: string; icon: string }> = {
-  token_gate:        { bg: '#FFF0E8', color: '#B04A10', icon: '🔒' },
-  free_uses:         { bg: '#E8F4FF', color: '#1A5FA8', icon: '⚡' },
-  burns_clawd:       { bg: '#FFF0F0', color: '#AA2222', icon: '🔥' },
-  paid:              { bg: '#F0FFF0', color: '#1A6B2A', icon: '💵' },
-  free:              { bg: '#F0FFF0', color: '#1A6B2A', icon: '🌐' },
-  subject_to_change: { bg: '#FFFFF0', color: '#7A6A00', icon: '⚠️' },
-  custom:            { bg: '#F5F5F5', color: '#555555', icon: '•' },
+  token_gate:        { bg: 'var(--ft-token-bg)', color: 'var(--ft-token-fg)', icon: '🔒' },
+  free_uses:         { bg: 'var(--ft-freeuses-bg)', color: 'var(--ft-freeuses-fg)', icon: '⚡' },
+  burns_clawd:       { bg: 'var(--ft-burns-bg)', color: 'var(--ft-burns-fg)', icon: '🔥' },
+  paid:              { bg: 'var(--ft-paid-bg)', color: 'var(--ft-paid-fg)', icon: '💵' },
+  free:              { bg: 'var(--ft-free-bg)', color: 'var(--ft-free-fg)', icon: '🌐' },
+  subject_to_change: { bg: 'var(--ft-warn-bg)', color: 'var(--ft-warn-fg)', icon: '⚠️' },
+  custom:            { bg: 'var(--ft-custom-bg)', color: 'var(--ft-custom-fg)', icon: '•' },
 }
 
 function getBuildStatusStyle(status?: string) {
   if (!status) return null
-  return BUILD_STATUS_STYLE[status] || { bg: '#F0F0FF', color: '#444', dot: '#999' }
+  return BUILD_STATUS_STYLE[status] || {
+    bg: 'var(--status-fallback-bg)',
+    color: 'var(--status-fallback-fg)',
+    dot: 'var(--status-fallback-dot)',
+  }
 }
 
 function initials(name: string) {
