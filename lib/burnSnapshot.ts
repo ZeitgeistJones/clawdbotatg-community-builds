@@ -1,5 +1,5 @@
 import { kv } from '@/lib/kv'
-import { fetchOnChainBurnTotals } from '@/lib/clawdBurnIndex'
+import { fetchOnChainBurnTotals, getReceiverTxDebug } from '@/lib/clawdBurnIndex'
 import { formatClawdAmount } from '@/lib/burnIndexer'
 
 export const HUB_TOTAL_KEY = 'burns:hub:totalWei'
@@ -33,9 +33,23 @@ export async function getHubBurnCache(): Promise<HubBurnCache | null> {
   }
 }
 
-/** Blockscout scan — run from cron/admin, not on every page view */
+/** Blockscout scan — run from cron/admin, not on every page view.
+ *  Never clobber a known-good hub total with a failed/empty scan. */
 export async function syncHubBurnCache(): Promise<HubBurnCache> {
+  const existing = await getHubBurnCache()
   const onChain = await fetchOnChainBurnTotals()
+  const debug = getReceiverTxDebug()
+
+  // If the scan failed or returned nothing but we already have a positive total, keep it.
+  if (
+    onChain.totalWei === 0n &&
+    existing &&
+    existing.totalWei > 0n &&
+    (debug.pagesFailed > 0 || debug.matchedTransfers === 0)
+  ) {
+    return existing
+  }
+
   const updatedAt = Date.now()
 
   await Promise.all([

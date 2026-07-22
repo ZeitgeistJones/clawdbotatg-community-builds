@@ -144,7 +144,7 @@ function AdminInner() {
       if (approvedData) setApproved(approvedData)
       if (csData) setComingSoon(csData)
       if (burnData) {
-        setBurnTotal(burnData.formatted)
+        setBurnTotal(burnData.hubBurn?.totalFormatted ?? burnData.formatted)
         setRescoreTotal(burnData.rescores ?? 0)
         const map: Record<string, string> = {}
         const rMap: Record<string, number> = {}
@@ -337,7 +337,7 @@ function AdminInner() {
         return
       }
 
-      setBurnTotal(data.formatted)
+      setBurnTotal(data.hubBurn?.totalFormatted ?? data.formatted)
       setRescoreTotal(data.rescores ?? 0)
 
       const r = data.results?.[0]
@@ -351,6 +351,7 @@ function AdminInner() {
       }
 
       const stats = await fetch(`/api/admin/backfill-burns?key=${key}`).then(r => r.json())
+      setBurnTotal(stats.hubBurn?.totalFormatted ?? stats.formatted ?? data.hubBurn?.totalFormatted ?? data.formatted)
       const map: Record<string, string> = {}
       const rMap: Record<string, number> = {}
       for (const row of stats.byApp || []) {
@@ -579,7 +580,7 @@ function AdminInner() {
                             placeholder="builder name / handle"
                             style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '12px', fontFamily: 'inherit' }} />
                           <div style={{ display: 'flex', gap: '6px' }}>
-                            <button className={styles.statusBtn} onClick={() => saveInfo(p.id)} disabled={savingInfo}>
+                            <button className={styles.approveBtn} onClick={() => saveInfo(p.id)} disabled={savingInfo}>
                               {savingInfo ? 'saving…' : 'save changes'}
                             </button>
                             <button className={styles.statusBtn} onClick={() => setEditingInfoId(null)}>cancel</button>
@@ -641,6 +642,12 @@ function AdminInner() {
                       <div style={{ marginTop: '8px' }}>
                         {editingBurnId === p.id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <button className={styles.approveBtn} onClick={() => saveBurnConfig(p.id)} disabled={savingBurn}>
+                                {savingBurn ? 'saving…' : 'save changes'}
+                              </button>
+                              <button className={styles.statusBtn} onClick={() => setEditingBurnId(null)}>cancel</button>
+                            </div>
                             <BurnConfigFields form={burnForm} setForm={setBurnForm} />
                             <div style={{ display: 'flex', gap: '6px' }}>
                               <button className={styles.approveBtn} onClick={() => saveBurnConfig(p.id)} disabled={savingBurn}>
