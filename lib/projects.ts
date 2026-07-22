@@ -151,6 +151,16 @@ export async function submitProject(data: Omit<Project, 'id' | 'status' | 'submi
   return project
 }
 
+// Admin-only: create a project that's already approved, bypassing the wallet-signed
+// submit -> pending -> approve flow. Used by the "drop a link" quick-add feature.
+export async function quickAddProject(data: Omit<Project, 'id' | 'status' | 'submittedAt'>): Promise<Project> {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const project: Project = { ...data, id, status: 'approved', submittedAt: Date.now() }
+  await kv.set(`project:${id}`, project)
+  await kv.lpush(APPROVED_KEY, id)
+  return project
+}
+
 export async function approveProject(id: string): Promise<void> {
   const project = await kv.get<Project>(`project:${id}`)
   if (!project) throw new Error('Project not found')
@@ -257,3 +267,4 @@ const SEED_PROJECTS: Project[] = [
     submittedAt: 0,
   },
 ]
+

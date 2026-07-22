@@ -27,6 +27,17 @@ interface ComingSoonItem {
   url?: string
 }
 
+interface QuickAddDraft {
+  name: string
+  desc: string
+  emoji: string
+  tag: string
+  buildStatus: string
+  featureTags?: { type: string; label: string; value?: string }[]
+  url: string
+  source: { hasStatusEndpoint: boolean; descFromClaude: boolean }
+}
+
 const BUILD_STATUSES = ['building', 'beta', 'v1', 'offline']
 const EMOJIS = ['⏳','🛠️','🗣️','👁️','📊','🔐','🎮','🌐','🤖','💎','🔥','⚡','🧠','🎯','🪄','🦾','🚀']
 
@@ -53,6 +64,12 @@ function AdminInner() {
   const [syncingBurns, setSyncingBurns] = useState(false)
   const [burnStatus, setBurnStatus] = useState<string | null>(null)
   const [burnError, setBurnError] = useState<string | null>(null)
+
+  const [quickUrl, setQuickUrl] = useState('')
+  const [autofilling, setAutofilling] = useState(false)
+  const [autofillError, setAutofillError] = useState<string | null>(null)
+  const [draft, setDraft] = useState<QuickAddDraft | null>(null)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     if (!key) { setAuth(false); setLoading(false); return }
@@ -116,6 +133,61 @@ function AdminInner() {
     })
     if (res.ok) setApproved(a => a.filter(p => p.id !== id))
     setActing(null)
+  }
+
+  async function runAutofill() {
+    if (!quickUrl) return
+    setAutofilling(true)
+    setAutofillError(null)
+    setDraft(null)
+    try {
+      const res = await fetch('/api/admin/autofill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: quickUrl, key }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAutofillError(data.error || 'Autofill failed')
+        return
+      }
+      setDraft(data)
+    } catch {
+      setAutofillError('Network error during autofill')
+    } finally {
+      setAutofilling(false)
+    }
+  }
+
+  async function submitQuickAdd() {
+    if (!draft || !draft.name || !draft.url) return
+    setAdding(true)
+    setAutofillError(null)
+    try {
+      const res = await fetch('/api/admin/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...draft, key }),
+      })
+      if (res.ok) {
+        const project = await res.json()
+        setApproved(a => [project, ...a])
+        setDraft(null)
+        setQuickUrl('')
+        setTab('approved')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setAutofillError(data.error || 'Could not add project')
+      }
+    } catch {
+      setAutofillError('Network error while adding')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  function setDraftField<K extends keyof QuickAddDraft>(field: K, value: QuickAddDraft[K]) {
+    setDraft(d => d ? { ...d, [field]: value } : d)
   }
 
   async function syncBurns(fullBackfill: boolean) {
@@ -225,6 +297,73 @@ function AdminInner() {
         )}
         {burnStatus && <div className={styles.burnStatus}>{burnStatus}</div>}
         {burnError && <div className={styles.burnError}>{burnError}</div>}
+
+        {/* QUICK ADD */}
+        <div className={styles.card} style={{ marginBottom: '1rem' }}>
+          <div className={styles.statusLabel} style={{ marginBottom: '8px' }}>🔗 quick add from link</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="url"
+              placeholder="https://someapp.vercel.app"
+              value={quickUrl}
+              onChange={e => setQuickUrl(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && quickUrl && !autofilling) runAutofill() }}
+              style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }}
+            />
+            <button className={styles.approveBtn} onClick={runAutofill} disabled={!quickUrl || autofilling}>
+              {autofilling ? 'reading site…' : 'autofill'}
+            </button>
+          </div>
+          {autofillError && <p className={styles.error}>{autofillError}</p>}
+
+          {draft && (
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select value={draft.emoji} onChange={e => setDraftField('emoji', e.target.value)}
+                  style={{ width: '70px', padding: '8px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '16px', fontFamily: 'inherit' }}>
+                  {EMOJIS.map(em => <option key={em} value={em}>{em}</option>)}
+                </select>
+                <input type="text" placeholder="name" value={draft.name}
+                  onChange={e => setDraftField('name', e.target.value)}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }} />
+                <select value={draft.tag} onChange={e => setDraftField('tag', e.target.value)}
+                  style={{ padding: '8px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit' }}>
+                  <option value="tool">tool</option>
+                  <option value="data">data</option>
+                  <option value="game">game</option>
+                  <option value="social">social</option>
+                </select>
+              </div>
+              <textarea placeholder="description" value={draft.desc} rows={2}
+                onChange={e => setDraftField('desc', e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e5e5', fontSize: '13px', fontFamily: 'inherit', resize: 'none' }} />
+              <div className={styles.statusRow}>
+                {BUILD_STATUSES.map(s => (
+                  <button key={s}
+                    className={`${styles.statusBtn} ${draft.buildStatus === s ? styles.statusBtnActive : ''}`}
+                    onClick={() => setDraftField('buildStatus', s)}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.cardWallet}>
+                {draft.source.hasStatusEndpoint ? '✓ pulled live status/tags from /api/status' : 'no /api/status found on that site — check tags manually'}
+                {' · '}
+                {draft.source.descFromClaude ? 'description drafted by claude' : 'description scraped from page meta tags'}
+              </div>
+              {draft.featureTags && draft.featureTags.length > 0 && (
+                <div className={styles.cardWallet}>tags: {draft.featureTags.map(t => t.label).join(', ')}</div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className={styles.approveBtn} onClick={submitQuickAdd} disabled={adding || !draft.name}>
+                  {adding ? 'adding…' : '+ add to hub'}
+                </button>
+                <button className={styles.rejectBtn} onClick={() => setDraft(null)}>cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className={styles.tabs}>
           <button className={`${styles.tab} ${tab === 'pending' ? styles.tabActive : ''}`} onClick={() => setTab('pending')}>
             pending {pending.length > 0 && <span className={styles.badge}>{pending.length}</span>}
@@ -433,3 +572,4 @@ export default function AdminPage() {
     </Suspense>
   )
 }
+
