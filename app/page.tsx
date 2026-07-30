@@ -140,7 +140,7 @@ export default async function Home() {
       </div>
 
       <p className={styles.disclaimer}>
-        ⚠️ pricing, access requirements, and feature tags are set by individual builders and may not reflect the current state of each app. always verify before connecting your wallet or making any transactions.
+        ⚠️ pricing, access requirements, and feature tags may not reflect the current state of each app. always verify before connecting your wallet or making any transactions.
       </p>
 
       <footer className={styles.footer}>
