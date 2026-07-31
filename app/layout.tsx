@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { Providers } from './providers'
 import DarkModeToggle from './components/DarkModeToggle'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   title: 'clawdbotatg community builds',
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <DarkModeToggle />
           {children}
         </Providers>
+        <Analytics />
       </body>
     </html>
   )
