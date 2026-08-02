@@ -1,8 +1,7 @@
 import { getApproved } from '@/lib/projects'
+import type { FeatureTag } from '@/lib/projects'
 import { getBurnHubSnapshot } from '@/lib/burnHub'
-import { resolvePreview } from '@/lib/preview'
 import BurnStats from './components/BurnStats'
-import ProjectShot from './components/ProjectShot'
 import styles from './page.module.css'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -14,6 +13,43 @@ const kv = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 })
 
+const TAG_STYLE: Record<string, { bg: string; color: string }> = {
+  tool:   { bg: 'var(--tag-tool-bg)', color: 'var(--tag-tool-fg)' },
+  game:   { bg: 'var(--tag-game-bg)', color: 'var(--tag-game-fg)' },
+  data:   { bg: 'var(--tag-data-bg)', color: 'var(--tag-data-fg)' },
+  social: { bg: 'var(--tag-social-bg)', color: 'var(--tag-social-fg)' },
+}
+
+const BUILD_STATUS_STYLE: Record<string, { bg: string; color: string; dot: string }> = {
+  building: { bg: 'var(--status-building-bg)', color: 'var(--status-building-fg)', dot: 'var(--status-building-dot)' },
+  beta:     { bg: 'var(--status-beta-bg)', color: 'var(--status-beta-fg)', dot: 'var(--status-beta-dot)' },
+  v1:       { bg: 'var(--status-v1-bg)', color: 'var(--status-v1-fg)', dot: 'var(--status-v1-dot)' },
+  offline:  { bg: 'var(--status-offline-bg)', color: 'var(--status-offline-fg)', dot: 'var(--status-offline-dot)' },
+}
+
+const FEATURE_TAG_STYLE: Record<string, { bg: string; color: string; icon: string }> = {
+  token_gate:        { bg: 'var(--ft-token-bg)', color: 'var(--ft-token-fg)', icon: '🔒' },
+  free_uses:         { bg: 'var(--ft-freeuses-bg)', color: 'var(--ft-freeuses-fg)', icon: '⚡' },
+  burns_clawd:       { bg: 'var(--ft-burns-bg)', color: 'var(--ft-burns-fg)', icon: '🔥' },
+  paid:              { bg: 'var(--ft-paid-bg)', color: 'var(--ft-paid-fg)', icon: '💵' },
+  free:              { bg: 'var(--ft-free-bg)', color: 'var(--ft-free-fg)', icon: '🌐' },
+  subject_to_change: { bg: 'var(--ft-warn-bg)', color: 'var(--ft-warn-fg)', icon: '⚠️' },
+  custom:            { bg: 'var(--ft-custom-bg)', color: 'var(--ft-custom-fg)', icon: '•' },
+}
+
+function getBuildStatusStyle(status?: string) {
+  if (!status) return null
+  return BUILD_STATUS_STYLE[status] || {
+    bg: 'var(--status-fallback-bg)',
+    color: 'var(--status-fallback-fg)',
+    dot: 'var(--status-fallback-dot)',
+  }
+}
+
+function initials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
 interface ComingSoonItem {
   id: string
   name: string
@@ -21,42 +57,6 @@ interface ComingSoonItem {
   emoji: string
   teaser?: string
   url?: string
-}
-
-/** Distinct poster palettes — used when screenshot/OG fails */
-const SHOT_PALETTES = [
-  { from: '#2a1410', mid: '#8a3a22', to: '#ff7a45', ink: '#fff4ee' },
-  { from: '#0c1a18', mid: '#1a5c48', to: '#3ecf8e', ink: '#e8fff5' },
-  { from: '#141820', mid: '#2a4060', to: '#6eb6ff', ink: '#eef6ff' },
-  { from: '#1a1218', mid: '#6a2a40', to: '#ff6b8a', ink: '#ffeef2' },
-  { from: '#16140c', mid: '#6a5820', to: '#e8c84a', ink: '#fffceb' },
-  { from: '#101418', mid: '#2a4850', to: '#5ad4c8', ink: '#e8fffc' },
-  { from: '#1c1010', mid: '#7a2828', to: '#f06050', ink: '#fff0ee' },
-  { from: '#101610', mid: '#3a5a28', to: '#8fd45a', ink: '#f2ffe8' },
-]
-
-function hashId(id: string) {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return h
-}
-
-function shotStyle(id: string) {
-  const p = SHOT_PALETTES[hashId(id) % SHOT_PALETTES.length]
-  const angle = 135 + (hashId(id) % 50)
-  return {
-    ['--shot-from' as string]: p.from,
-    ['--shot-mid' as string]: p.mid,
-    ['--shot-to' as string]: p.to,
-    ['--shot-ink' as string]: p.ink,
-    ['--shot-angle' as string]: `${angle}deg`,
-  }
-}
-
-function monogram(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase()
 }
 
 export const revalidate = 0
@@ -69,11 +69,6 @@ export default async function Home() {
     approvedPromise.then(p => getBurnHubSnapshot(p)),
   ])
   const { totalFormatted, lastBurnAt, pending } = burnHub
-
-  const [projectPreviews, soonPreviews] = await Promise.all([
-    Promise.all(projects.map(p => resolvePreview(p.url))),
-    Promise.all(comingSoon.map(item => (item.url ? resolvePreview(item.url) : Promise.resolve(null)))),
-  ])
 
   return (
     <main className={styles.wrap}>
@@ -96,30 +91,56 @@ export default async function Home() {
       </header>
 
       <div className={styles.grid}>
-        {projects.map((p, i) => (
-          <ProjectShot
-            key={p.id}
-            href={p.url}
-            name={p.name}
-            builder={p.builder}
-            preview={projectPreviews[i]}
-            monogram={monogram(p.name)}
-            style={shotStyle(p.id)}
-          />
+        {projects.map(p => {
+          const tag = TAG_STYLE[p.tag] || TAG_STYLE.tool
+          const bStyle = getBuildStatusStyle(p.buildStatus)
+          return (
+            <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" className={styles.card}>
+              {bStyle && (
+                <div className={styles.statusBadge} style={{ background: bStyle.bg, color: bStyle.color }}>
+                  <span className={styles.statusDot} style={{ background: bStyle.dot }} />
+                  {p.buildStatus}
+                </div>
+              )}
+              <span className={styles.emoji}>{p.emoji}</span>
+              <div className={styles.cardName}>{p.name}</div>
+              <div className={styles.cardDesc}>{p.desc}</div>
+              <span className={styles.tag} style={{ background: tag.bg, color: tag.color }}>
+                {p.tag}
+              </span>
+              {p.featureTags && p.featureTags.length > 0 && (
+                <div className={styles.featureTags}>
+                  {p.featureTags.map((ft: FeatureTag, i: number) => {
+                    const fStyle = FEATURE_TAG_STYLE[ft.type] || FEATURE_TAG_STYLE.custom
+                    return (
+                      <span key={i} className={styles.featureTag} style={{ background: fStyle.bg, color: fStyle.color }}>
+                        {fStyle.icon} {ft.label}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+              <div className={styles.builder}>
+                <div className={styles.dot}>{initials(p.builder)}</div>
+                <span>{p.builder}</span>
+              </div>
+            </a>
+          )
+        })}
+
+        {comingSoon.map(item => (
+          <ComingSoonCard key={item.id} item={item} />
         ))}
 
-        {comingSoon.map((item, i) => (
-          <ComingSoonCard key={item.id} item={item} preview={soonPreviews[i]} />
-        ))}
-
-        <Link href="/submit" className={`${styles.shot} ${styles.addShot}`}>
+        <Link href="/submit" className={`${styles.card} ${styles.addCard}`}>
           <span className={styles.addIcon}>＋</span>
           <span className={styles.addLabel}>submit your project</span>
+          <span className={styles.addNote}>reviewed before it goes live</span>
         </Link>
       </div>
 
       <p className={styles.disclaimer}>
-        ⚠️ always verify pricing and access requirements before connecting your wallet or making any transactions.
+        ⚠️ pricing, access requirements, and feature tags may not reflect the current state of each app. always verify before connecting your wallet or making any transactions.
       </p>
 
       <footer className={styles.footer}>
